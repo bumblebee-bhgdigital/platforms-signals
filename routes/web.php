@@ -19,6 +19,7 @@
  */
 
 use Platform\Signals\Livewire\Dashboard;
+use Platform\Signals\Livewire\Show;
 use Platform\Signals\Livewire\Showcase;
 
 /**
@@ -27,6 +28,11 @@ use Platform\Signals\Livewire\Showcase;
  * Hauptübersicht des Moduls
  */
 Route::get('/', Dashboard::class)->name('signals.dashboard');
+
+// Übersicht aller Sets (Alias auf dieselbe Komponente) und Detailseite.
+// {signalSet} = Route-Model-Binding auf die ID (wie {plannerProject} im Planner).
+Route::get('/sets', Dashboard::class)->name('signals.sets.index');
+Route::get('/sets/{signalSet}', Show::class)->name('signals.sets.show');
 
 /**
  * nx-Showcase Route

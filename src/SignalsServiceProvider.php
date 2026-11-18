@@ -23,6 +23,8 @@
 
 namespace Platform\Signals;
 
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -193,14 +195,102 @@ class SignalsServiceProvider extends ServiceProvider
          * <livewire:signals.dashboard />
          */
         $this->registerLivewireComponents();
-        
+
         /**
-         * SCHRITT 7: Tools registrieren (optional)
-         * 
-         * Falls dein Modul AI/Chat-Tools hat:
-         * 
-         * $this->registerTools();
+         * SCHRITT 7: Morph-Alias, Policy, Tools
          */
+        $this->registerMorphMap();
+        $this->registerPolicies();
+        $this->registerEntityLinkProvider();
+        $this->registerTools();
+    }
+
+    /**
+     * Organization-Bridge: Signal-Set als verknüpfbarer Objekttyp (EntityLinkProvider) + Link-Hook.
+     */
+    protected function registerEntityLinkProvider(): void
+    {
+        try {
+            resolve(\Platform\Organization\Services\EntityLinkRegistry::class)
+                ->register(new \Platform\Signals\Organization\SignalSetEntityLinkProvider());
+        } catch (\Throwable $e) {
+            // Organization-Modul nicht geladen
+        }
+
+        // Verknüpfungen entstehen nicht nur über den SignalSetService, sondern auch extern
+        // (organization.entity.link.POST, Terminal-App "Verknüpfungen"). Der Hook hält die
+        // Vererbungs-Einstellungen (signal_set_nodes) konsistent und dispatcht das Event.
+        if (class_exists(\Platform\Organization\Models\OrganizationDimensionLink::class)) {
+            \Platform\Organization\Models\OrganizationDimensionLink::created(function ($link) {
+                $this->onDimensionLinkChanged($link, \Platform\Signals\Events\SignalSetLinkChanged::LINKED);
+            });
+            \Platform\Organization\Models\OrganizationDimensionLink::deleted(function ($link) {
+                $this->onDimensionLinkChanged($link, \Platform\Signals\Events\SignalSetLinkChanged::UNLINKED);
+            });
+        }
+    }
+
+    protected function onDimensionLinkChanged($link, string $action): void
+    {
+        if ($link->linkable_type !== \Platform\Signals\Models\SignalSet::MORPH_ALIAS) {
+            return;
+        }
+
+        try {
+            $set = \Platform\Signals\Models\SignalSet::withTrashed()->find($link->linkable_id);
+            if (! $set) {
+                return;
+            }
+            \Platform\Organization\Services\EntityDimensionBridge::flush();
+            $entityId = \Platform\Organization\Services\EntityDimensionBridge::entityId((int) $link->dimension_value_id);
+
+            if ($entityId) {
+                if ($action === \Platform\Signals\Events\SignalSetLinkChanged::LINKED) {
+                    \Platform\Signals\Models\SignalSetNode::query()->firstOrCreate(
+                        ['signal_set_id' => $set->id, 'entity_id' => $entityId],
+                        ['inherit_down' => false],
+                    );
+                } else {
+                    \Platform\Signals\Models\SignalSetNode::query()
+                        ->where('signal_set_id', $set->id)->where('entity_id', $entityId)->delete();
+                }
+            }
+
+            \Platform\Signals\Events\SignalSetLinkChanged::dispatch($set, $action, $entityId ?: null);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Signals: DimensionLink-Hook fehlgeschlagen', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /** Morph-Alias `signal_set` (DimensionLinks, EntityLinkProvider, Authz). */
+    protected function registerMorphMap(): void
+    {
+        Relation::morphMap([
+            \Platform\Signals\Models\SignalSet::MORPH_ALIAS => \Platform\Signals\Models\SignalSet::class,
+        ]);
+    }
+
+    /** Graph-Autorisierung wie PlannerProjectPolicy. */
+    protected function registerPolicies(): void
+    {
+        Gate::policy(
+            \Platform\Signals\Models\SignalSet::class,
+            \Platform\Signals\Policies\SignalSetPolicy::class
+        );
+    }
+
+    /** MCP-Tools signal_sets.GET/POST/PUT/DELETE in der Tool-Registry. */
+    protected function registerTools(): void
+    {
+        try {
+            $registry = resolve(\Platform\Core\Tools\ToolRegistry::class);
+            $registry->register(new \Platform\Signals\Tools\ListSignalSetsTool());
+            $registry->register(new \Platform\Signals\Tools\CreateSignalSetTool());
+            $registry->register(new \Platform\Signals\Tools\UpdateSignalSetTool());
+            $registry->register(new \Platform\Signals\Tools\DeleteSignalSetTool());
+        } catch (\Throwable $e) {
+            // ToolRegistry nicht verfügbar
+        }
     }
 
     /**

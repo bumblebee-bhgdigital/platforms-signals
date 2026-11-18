@@ -1,60 +1,62 @@
 {{--
-    Sidebar View
-    Modul-spezifische Sidebar (nx-Design-System)
-
-    WICHTIG FÜR LLMs:
-    - Wird automatisch in der Haupt-Sidebar eingebunden
-    - Verwendet x-ui-sidebar-list und x-ui-sidebar-item (Shell, „Eimer 1")
-    - Unterstützt collapsed/expanded Zustand
-    - Kann dynamische Listen enthalten
-
-    DESIGN: Nur var(--nx-*) Tokens — Text=var(--nx-text), Linien=var(--nx-line),
-    Hover=var(--nx-bg). KEINE var(--ui-*)/ENV-Farben.
-
-    ANPASSUNGEN:
-    - Füge modul-spezifische Navigation hinzu
-    - Implementiere dynamische Listen (z.B. aus Datenbank)
+    Sidebar View (nx-Design-System) — Signal-Sets nach Knoten gruppiert, Unverknüpfte separat.
+    Struktur wie planner::livewire.sidebar. Nur var(--nx-*) Tokens.
+    Ein Set kann unter mehreren Knoten erscheinen.
 --}}
 
 <div>
-    {{-- Modul Header --}}
-    <div x-show="!collapsed" class="p-3 text-sm italic text-[var(--nx-text)] uppercase border-b border-[color:var(--nx-line)] mb-2">
+    <a x-show="!collapsed" href="{{ route('signals.dashboard') }}" wire:navigate
+       class="block p-3 text-sm italic text-[var(--nx-text)] uppercase border-b border-[var(--nx-line)] mb-2 hover:text-[var(--nx-accent)]">
         Signals
+    </a>
+
+    {{-- Eingeklappt: Einstieg in die Übersicht --}}
+    <div x-show="collapsed" class="px-2 py-2 border-b border-[var(--nx-line)]">
+        <a href="{{ route('signals.dashboard') }}" wire:navigate title="Signal-Sets"
+           class="flex items-center justify-center p-2 rounded-md {{ request()->routeIs('signals.*') ? 'bg-[var(--nx-accent)]/10 text-[var(--nx-accent)]' : 'text-[var(--nx-text)] hover:bg-[var(--nx-bg)]' }}">
+            @svg('heroicon-o-bell-alert', 'w-5 h-5')
+        </a>
     </div>
 
-    {{-- Abschnitt: Allgemein --}}
-    <x-ui-sidebar-list label="Allgemein">
-        <x-ui-sidebar-item :href="route('signals.dashboard')">
-            @svg('heroicon-o-home', 'w-4 h-4 text-[var(--nx-text)]')
-            <span class="ml-2 text-sm">Dashboard</span>
-        </x-ui-sidebar-item>
-        <x-ui-sidebar-item :href="route('signals.showcase')">
-            @svg('heroicon-o-swatch', 'w-4 h-4 text-[var(--nx-text)]')
-            <span class="ml-2 text-sm">nx-Showcase</span>
-        </x-ui-sidebar-item>
-    </x-ui-sidebar-list>
-
-    {{-- Collapsed: Icons-only --}}
-    <div x-show="collapsed" class="px-2 py-2 border-b border-[color:var(--nx-line)]">
-        <div class="flex flex-col gap-2">
-            <a href="{{ route('signals.dashboard') }}" wire:navigate class="flex items-center justify-center p-2 rounded-md text-[var(--nx-text)] hover:bg-[var(--nx-bg)]">
-                @svg('heroicon-o-home', 'w-5 h-5')
-            </a>
-            <a href="{{ route('signals.showcase') }}" wire:navigate class="flex items-center justify-center p-2 rounded-md text-[var(--nx-text)] hover:bg-[var(--nx-bg)]">
-                @svg('heroicon-o-swatch', 'w-5 h-5')
-            </a>
-        </div>
-    </div>
-
-    {{-- BEISPIEL: Dynamische Liste (auskommentiert) --}}
-    {{--
-    <x-ui-sidebar-list label="Dynamische Liste">
-        @foreach($entities as $entity)
-            <x-ui-sidebar-item :href="route('signals.entities.show', ['entity' => $entity])">
-                @svg('heroicon-o-cube', 'w-4 h-4 text-[var(--nx-text)]')
-                <span class="ml-2 text-sm">{{ $entity->name }}</span>
-            </x-ui-sidebar-item>
+    <div class="mt-2" x-show="!collapsed">
+        {{-- Knoten-Gruppen (Entity-Typ -> Baum -> Sets) --}}
+        @foreach($entityTypeGroups as $typeGroup)
+            <x-ui-sidebar-list wire:key="sg-type-group-{{ $typeGroup['type_id'] }}" :label="$typeGroup['type_name']">
+                @foreach($typeGroup['entities'] as $entityNode)
+                    @include('signals::livewire.partials.sidebar-entity-node', [
+                        'node' => $entityNode,
+                        'typeIcon' => $typeGroup['type_icon'] ?? null,
+                        'linkingSetId' => $linkingSetId,
+                        'linkingAnchor' => $linkingAnchor,
+                        'linkInherit' => $linkInherit,
+                        'linkCandidates' => $linkCandidates,
+                    ])
+                @endforeach
+            </x-ui-sidebar-list>
         @endforeach
-    </x-ui-sidebar-list>
-    --}}
+
+        {{-- Nicht verknüpfte Sets --}}
+        @if($unlinkedSets->isNotEmpty())
+            <x-ui-sidebar-list label="Unverknüpft">
+                @foreach($unlinkedSets as $set)
+                    @include('signals::livewire.partials.sidebar-set-row', [
+                        'set' => $set, 'nodeId' => null, 'inherit' => false,
+                        'linkingSetId' => $linkingSetId, 'linkingAnchor' => $linkingAnchor, 'linkInherit' => $linkInherit, 'linkCandidates' => $linkCandidates,
+                    ])
+                @endforeach
+            </x-ui-sidebar-list>
+        @endif
+
+        @if($entityTypeGroups->isEmpty() && $unlinkedSets->isEmpty())
+            <div class="px-3 py-1 text-xs text-[var(--nx-muted)]">Keine Signal-Sets</div>
+        @endif
+
+        {{-- Showcase (Gerüst-Beispiel) bleibt erreichbar --}}
+        <x-ui-sidebar-list label="Entwicklung">
+            <x-ui-sidebar-item :href="route('signals.showcase')">
+                @svg('heroicon-o-swatch', 'w-4 h-4 text-[var(--nx-text)]')
+                <span class="ml-2 text-sm">nx-Showcase</span>
+            </x-ui-sidebar-item>
+        </x-ui-sidebar-list>
+    </div>
 </div>

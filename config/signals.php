@@ -42,7 +42,7 @@ return [
      */
     'navigation' => [
         'route' => 'signals.dashboard',
-        'icon'  => 'heroicon-o-cube',
+        'icon'  => 'heroicon-o-bell-alert',
         'order' => 100, // Hohe Zahl = weiter unten in der Navigation
     ],
 
@@ -68,12 +68,12 @@ return [
      */
     'sidebar' => [
         [
-            'group' => 'Allgemein',
+            'group' => 'Signal-Sets',
             'items' => [
                 [
-                    'label' => 'Dashboard',
+                    'label' => 'Übersicht',
                     'route' => 'signals.dashboard',
-                    'icon'  => 'heroicon-o-home',
+                    'icon'  => 'heroicon-o-bell-alert',
                 ],
                 [
                     'label' => 'nx-Showcase',
