@@ -23,6 +23,8 @@
 
 namespace Platform\Signals;
 
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -193,14 +195,44 @@ class SignalsServiceProvider extends ServiceProvider
          * <livewire:signals.dashboard />
          */
         $this->registerLivewireComponents();
-        
+
         /**
-         * SCHRITT 7: Tools registrieren (optional)
-         * 
-         * Falls dein Modul AI/Chat-Tools hat:
-         * 
-         * $this->registerTools();
+         * SCHRITT 7: Morph-Alias, Policy, Tools
          */
+        $this->registerMorphMap();
+        $this->registerPolicies();
+        $this->registerTools();
+    }
+
+    /** Morph-Alias `signal_set` (DimensionLinks, EntityLinkProvider, Authz). */
+    protected function registerMorphMap(): void
+    {
+        Relation::morphMap([
+            \Platform\Signals\Models\SignalSet::MORPH_ALIAS => \Platform\Signals\Models\SignalSet::class,
+        ]);
+    }
+
+    /** Graph-Autorisierung wie PlannerProjectPolicy. */
+    protected function registerPolicies(): void
+    {
+        Gate::policy(
+            \Platform\Signals\Models\SignalSet::class,
+            \Platform\Signals\Policies\SignalSetPolicy::class
+        );
+    }
+
+    /** MCP-Tools signal_sets.GET/POST/PUT/DELETE in der Tool-Registry. */
+    protected function registerTools(): void
+    {
+        try {
+            $registry = resolve(\Platform\Core\Tools\ToolRegistry::class);
+            $registry->register(new \Platform\Signals\Tools\ListSignalSetsTool());
+            $registry->register(new \Platform\Signals\Tools\CreateSignalSetTool());
+            $registry->register(new \Platform\Signals\Tools\UpdateSignalSetTool());
+            $registry->register(new \Platform\Signals\Tools\DeleteSignalSetTool());
+        } catch (\Throwable $e) {
+            // ToolRegistry nicht verfügbar
+        }
     }
 
     /**
