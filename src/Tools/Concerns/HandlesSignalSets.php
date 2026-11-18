@@ -6,7 +6,9 @@ use Illuminate\Support\Facades\Gate;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\Team;
+use Platform\Organization\Models\OrganizationEntity;
 use Platform\Signals\Models\SignalSet;
+use Platform\Signals\Services\SignalSetService;
 
 /** Gemeinsame Helfer der signal_sets.*-Tools (Team-Auflösung, Serialisierung, Autorisierung). */
 trait HandlesSignalSets
@@ -35,6 +37,20 @@ trait HandlesSignalSets
         return ['team' => $team, 'error' => null];
     }
 
+    /**
+     * Darf der User an diesen Knoten verknüpfen? Gleiche Regel wie die Terminal-App "Verknüpfungen":
+     * Entity muss im Schreib-Reichweitenbereich des Users liegen (Core-Graph, kein eigenes Rollensystem).
+     */
+    protected function canWriteEntity(ToolContext $context, int $entityId): bool
+    {
+        if (! class_exists(\Platform\Organization\Authz\DimensionLinkAuthorizer::class)) {
+            return false;
+        }
+
+        return in_array($entityId, (new \Platform\Organization\Authz\DimensionLinkAuthorizer())->writableEntityIds($context->user), true)
+            && OrganizationEntity::whereKey($entityId)->exists();
+    }
+
     protected function authorizeSet(ToolContext $context, string $ability, SignalSet $set): ?ToolResult
     {
         return Gate::forUser($context->user)->allows($ability, $set)
@@ -45,6 +61,9 @@ trait HandlesSignalSets
     /** @return array<string,mixed> */
     protected function setToArray(SignalSet $set): array
     {
+        $assignments = app(SignalSetService::class)->nodeAssignments($set);
+        $names = $assignments === [] ? collect() : OrganizationEntity::whereIn('id', array_keys($assignments))->pluck('name', 'id');
+
         return [
             'id' => $set->id,
             'uuid' => $set->uuid,
@@ -56,6 +75,11 @@ trait HandlesSignalSets
             'owner_user_id' => $set->owner_user_id,
             'responsible_agent_user_id' => $set->responsible_agent_user_id,
             'created_by_user_id' => $set->created_by_user_id,
+            'nodes' => array_map(
+                fn ($id, $inherit) => ['entity_id' => $id, 'entity_name' => $names[$id] ?? null, 'inherit_down' => $inherit],
+                array_keys($assignments),
+                array_values($assignments)
+            ),
             'created_at' => $set->created_at?->toIso8601String(),
             'updated_at' => $set->updated_at?->toIso8601String(),
         ];
