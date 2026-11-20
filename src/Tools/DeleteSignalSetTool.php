@@ -16,13 +16,13 @@ class DeleteSignalSetTool implements ToolContract, ToolMetadataContract
 
     public function getName(): string
     {
-        return 'signal_sets.DELETE';
+        return 'signals.signal_sets.DELETE';
     }
 
     public function getDescription(): string
     {
         return 'DELETE /signal-sets/{id} - Löscht ein Signal-Set (Soft-Delete, wiederherstellbar). Pflicht: id. '
-            . 'Zum Beenden eines Sets ohne Löschen stattdessen signal_sets.PUT mit status=archived nutzen.';
+            . 'Zum Beenden eines Sets ohne Löschen stattdessen signals.signal_sets.PUT mit status=archived nutzen.';
     }
 
     public function getSchema(): array

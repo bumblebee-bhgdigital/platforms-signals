@@ -18,7 +18,7 @@ class UpdateSignalSetTool implements ToolContract, ToolMetadataContract
 
     public function getName(): string
     {
-        return 'signal_sets.PUT';
+        return 'signals.signal_sets.PUT';
     }
 
     public function getDescription(): string

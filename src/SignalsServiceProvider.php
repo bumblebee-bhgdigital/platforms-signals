@@ -279,7 +279,7 @@ class SignalsServiceProvider extends ServiceProvider
         );
     }
 
-    /** MCP-Tools signal_sets.GET/POST/PUT/DELETE in der Tool-Registry. */
+    /** MCP-Tools signals.signal_sets.GET/POST/PUT/DELETE in der Tool-Registry. */
     protected function registerTools(): void
     {
         try {

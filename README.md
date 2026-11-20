@@ -6,7 +6,7 @@ Gerüst aus `martin3r-me/platform-module-template`; noch keine Fachlogik. Namesp
 ## Signal-Set (Basis, #1028–#1030)
 
 Grundmodell: `SignalSet` (Morph-Alias `signal_set`), Service `SignalSetService`, Policy `SignalSetPolicy`,
-MCP-Tools `signal_sets.GET/POST/PUT/DELETE`. Messlogik (Definitionen, Kennzahlen, Signale, Agent) folgt in eigenen Boards.
+MCP-Tools `signals.signal_sets.GET/POST/PUT/DELETE`. Messlogik (Definitionen, Kennzahlen, Signale, Agent) folgt in eigenen Boards.
 
 ### Unterschiede zum Planner-Projekt
 
@@ -19,4 +19,4 @@ MCP-Tools `signal_sets.GET/POST/PUT/DELETE`. Messlogik (Definitionen, Kennzahlen
 | Verantwortlicher Agent | – | `responsible_agent_user_id` (User vom Typ `ai_user`) |
 | Event | Sidebar-Event | `SignalSetLinkChanged` (linked/unlinked/relinked/inherit_changed) + UI-Event `updateSidebar` |
 
-Direkt vs. vererbt: `SignalSetService::setsForNode()` bzw. `signal_sets.GET` mit `entity_id` liefert je Set `source=direct|inherited`.
+Direkt vs. vererbt: `SignalSetService::setsForNode()` bzw. `signals.signal_sets.GET` mit `entity_id` liefert je Set `source=direct|inherited`.
