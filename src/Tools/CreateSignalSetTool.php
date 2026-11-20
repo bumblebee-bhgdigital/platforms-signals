@@ -18,13 +18,13 @@ class CreateSignalSetTool implements ToolContract, ToolMetadataContract
 
     public function getName(): string
     {
-        return 'signal_sets.POST';
+        return 'signals.signal_sets.POST';
     }
 
     public function getDescription(): string
     {
         return 'POST /signal-sets - Legt ein Signal-Set an (Status standardmäßig draft). Pflicht: title. '
-            . 'Optional entity_id (+ inherit_down): hängt das Set direkt an einen Knoten. status=active aktiviert es sofort. Ein Set kann an mehrere Knoten gehängt werden (weitere über signal_sets.PUT).';
+            . 'Optional entity_id (+ inherit_down): hängt das Set direkt an einen Knoten. status=active aktiviert es sofort. Ein Set kann an mehrere Knoten gehängt werden (weitere über signals.signal_sets.PUT).';
     }
 
     public function getSchema(): array
@@ -34,7 +34,7 @@ class CreateSignalSetTool implements ToolContract, ToolMetadataContract
             'properties' => array_merge($this->setFieldSchema(), [
                 'team_id' => ['type' => 'integer', 'description' => 'Optional: Team-ID (Default: aktuelles Team).'],
                 'status' => ['type' => 'string', 'enum' => ['draft', 'active'], 'description' => 'Optional: draft (Default) oder active.'],
-                'entity_id' => ['type' => 'integer', 'description' => 'Optional: Knoten (Organisations-Entity), an den das Set gleich gehängt wird. Nutze "organization.entities.GET". Weitere Knoten über signal_sets.PUT.'],
+                'entity_id' => ['type' => 'integer', 'description' => 'Optional: Knoten (Organisations-Entity), an den das Set gleich gehängt wird. Nutze "organization.entities.GET". Weitere Knoten über signals.signal_sets.PUT.'],
                 'inherit_down' => ['type' => 'boolean', 'description' => 'Optional (mit entity_id): Set wirkt auch an allen Unterknoten (Default false).'],
             ]),
             'required' => ['title'],

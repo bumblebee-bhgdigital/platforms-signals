@@ -17,7 +17,7 @@ class ListSignalSetsTool implements ToolContract, ToolMetadataContract
 
     public function getName(): string
     {
-        return 'signal_sets.GET';
+        return 'signals.signal_sets.GET';
     }
 
     public function getDescription(): string

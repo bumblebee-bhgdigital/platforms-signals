@@ -10,7 +10,7 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Signals\Models\SignalSet;
 use Platform\Signals\Services\SignalSetService;
 
-/** Gemeinsame Helfer der signal_sets.*-Tools (Team-Auflösung, Serialisierung, Autorisierung). */
+/** Gemeinsame Helfer der signals.signal_sets.*-Tools (Team-Auflösung, Serialisierung, Autorisierung). */
 trait HandlesSignalSets
 {
     /** @return array{team: Team|null, error: ToolResult|null} */
