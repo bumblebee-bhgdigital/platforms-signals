@@ -254,4 +254,15 @@ class SignalsCoreTest extends TestCase
         app(\Platform\Signals\Services\SignalSetService::class)->update($this->set->fresh(), ['responsible_agent_user_id' => $this->s['agent']->id]);
         $this->assertTrue(Signal::all()->every(fn ($s) => $s->responsible_user_id === $this->s['agent']->id));
     }
+    public function test_entity_type_filter_limits_where_a_rule_fires(): void
+    {
+        $templateId = $this->ruleTemplate();
+        $this->tool(UpsertSetTemplateTool::class, ['signal_set_id' => $this->set->id, 'signal_template_id' => $templateId, 'conditions_override' => ['exclude_entity_types' => ['business_unit']]]);
+        app(SignalEvaluationService::class)->run();
+        $this->assertSame(0, Signal::count(), 'alle Knoten im Test sind business_unit');
+
+        $this->tool(UpsertSetTemplateTool::class, ['signal_set_id' => $this->set->id, 'signal_template_id' => $templateId, 'conditions_override' => ['entity_types' => ['business_unit']]]);
+        app(SignalEvaluationService::class)->run(null, true);
+        $this->assertSame(2, Signal::count());
+    }
 }

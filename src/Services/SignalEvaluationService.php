@@ -90,7 +90,9 @@ class SignalEvaluationService
     public function evaluateAssignment(SignalSet $set, SignalSetTemplate $assignment, array $entityIds, bool $dryRun = false): array
     {
         $template = $assignment->template;
-        $triggered = $this->rules->evaluate((string) $template->pattern_type, $assignment->effectiveConditions(), $entityIds);
+        $conditions = $assignment->effectiveConditions();
+        $entityIds = $this->filterByEntityType($entityIds, $conditions);
+        $triggered = $this->rules->evaluate((string) $template->pattern_type, $conditions, $entityIds);
         $triggeredIds = array_map(fn ($t) => (int) $t['entity_id'], $triggered);
 
         $resolved = 0;
@@ -150,6 +152,33 @@ class SignalEvaluationService
             'created' => $created,
             'resolved' => $resolved,
         ];
+    }
+
+    /**
+     * Optionaler Typ-Filter in den Bedingungen: entity_types (nur diese Knotentypen) bzw.
+     * exclude_entity_types (diese nicht), jeweils Typ-Codes wie container, board, initiative.
+     *
+     * @param  int[]  $entityIds
+     * @return int[]
+     */
+    public function filterByEntityType(array $entityIds, array $conditions): array
+    {
+        $only = array_values(array_filter((array) ($conditions['entity_types'] ?? [])));
+        $except = array_values(array_filter((array) ($conditions['exclude_entity_types'] ?? [])));
+        if ($entityIds === [] || ($only === [] && $except === [])) {
+            return $entityIds;
+        }
+
+        return OrganizationEntity::query()->whereIn('id', $entityIds)
+            ->whereHas('type', function ($q) use ($only, $except) {
+                if ($only !== []) {
+                    $q->whereIn('code', $only);
+                }
+                if ($except !== []) {
+                    $q->whereNotIn('code', $except);
+                }
+            })
+            ->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 
     /**

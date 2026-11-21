@@ -26,6 +26,7 @@ class CreateSignalTemplateTool implements ToolContract, ToolMetadataContract
         return 'POST /signals/templates - Legt ein Signal-Template an. Pflicht: name, kind (rule | inference, Default rule). '
             . 'rule: pattern_type + conditions. threshold {metric, operator, value}; trend {metric, direction increasing|decreasing, periods, min_change_percent}; '
             . 'ratio {numerator, denominator, operator, value, min_denominator?, grace_days?}; cross_dimension {metric_a, metric_b, relationship diverging|converging}. '
+            . 'Für alle Muster optional: entity_types bzw. exclude_entity_types (Liste von Knotentyp-Codes, z. B. ["container","board"]). '
             . 'Kennzahlen sind die Metriken der Knoten-Snapshots (z. B. items_open, items_done, items_total, time_total_minutes, planner_items_overdue, mb_*). frequency: every_snapshot | daily | weekly. '
             . 'inference: prompt, vsm_system (s1–s5, s3_star), data_sources (z. B. snapshots, movement, correspondence, activity_log, environment), dimension, schedule_interval_hours. '
             . 'Optional signal_set_id: Template direkt in dieses Set legen.';
