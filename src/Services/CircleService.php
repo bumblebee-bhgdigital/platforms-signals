@@ -23,30 +23,30 @@ class CircleService
     public const OUTCOMES = ['solved_locally', 'measure', 'returned_to_unit', 'escalated', 'strategy_topic', 'dismissed'];
 
     /**
-     * Verantwortliche Einheit eines Knotens: der Knoten selbst oder der nächste Vorfahr, der eine Einheit ist
-     * und einen Verantwortlichen hat („Führt an“). Fallback: nächster Träger (vsm_class carrier), sonst nächste Einheit, sonst der Knoten.
+     * Verantwortliche Einheit eines Knotens – aus der Struktur (VSM): der Knoten selbst oder der nächste Vorfahr, der ein
+     * Träger ist (Typ mit vsm_class carrier, z. B. Venture, Business Unit). Ohne Träger im Pfad: nächste Einheit mit
+     * Verantwortlichem („Führt an“), sonst die nächste Einheit, sonst der Knoten. Der Verantwortliche hängt an der Einheit
+     * (leaderOf) und ist optional.
      */
     public function unitFor(int $entityId): int
     {
-        $firstCarrier = null;
+        $firstLed = null;
         $firstUnit = null;
         $current = OrganizationEntity::with('type:id,code,vsm_class')->find($entityId);
         for ($depth = 0; $current && $depth < 30; $depth++) {
-            $isUnit = ! in_array($current->type?->code, self::NOT_A_UNIT, true);
-            if ($isUnit) {
-                if ($this->leaderOf($current->id)) {
+            if (! in_array($current->type?->code, self::NOT_A_UNIT, true)) {
+                if ($current->type?->vsm_class === 'carrier') {
                     return (int) $current->id;
                 }
                 $firstUnit ??= (int) $current->id;
-                if ($current->type?->vsm_class === 'carrier') {
-                    $firstCarrier ??= (int) $current->id;
+                if ($firstLed === null && $this->leaderOf($current->id)) {
+                    $firstLed = (int) $current->id;
                 }
             }
             $current = $current->parent_entity_id ? OrganizationEntity::with('type:id,code,vsm_class')->find($current->parent_entity_id) : null;
         }
 
-        // ohne Verantwortlichen: der nächste Träger (z. B. das Venture), sonst die nächste Einheit
-        return $firstCarrier ?? $firstUnit ?? $entityId;
+        return $firstLed ?? $firstUnit ?? $entityId;
     }
 
     /** Verantwortliche Person einer Einheit (Beziehung „Führt an“): ['entity_id','name','user_id'] oder null. */
@@ -226,10 +226,15 @@ class CircleService
         $gateway = CommitteeGateways::get();
         $meeting = $gateway?->nextMeeting($committeeEntityId);
 
-        // Bestand von vor dem Regelkreis: offene Signale ohne Einheit nachträglich zustellen
-        Signal::query()->whereIn('team_id', (array) $teamIds)->whereNull('unit_entity_id')
-            ->whereIn('status', ['open', 'acknowledged'])->limit(500)->get()
-            ->each(fn (Signal $s) => $this->deliver($s));
+        // Einheit offener Signale auf Stufe „unit“ aus der aktuellen Struktur ableiten (Bestand, umgehängte Knoten)
+        Signal::query()->whereIn('team_id', (array) $teamIds)->whereIn('status', ['open', 'acknowledged'])
+            ->where(fn ($q) => $q->whereNull('unit_entity_id')->orWhere('stage', 'unit'))->limit(500)->get()
+            ->each(function (Signal $s) {
+                $unit = $this->unitFor((int) $s->entity_id);
+                if ((int) $s->unit_entity_id !== $unit) {
+                    $s->forceFill(['unit_entity_id' => $unit, 'stage' => $s->stage ?: 'unit'])->save();
+                }
+            });
 
         $open = fn () => Signal::query()->whereIn('team_id', (array) $teamIds)->whereIn('status', ['open', 'acknowledged']);
         $inCommittee = $open()->where('stage', 'committee')->where('committee_entity_id', $committeeEntityId)->get();
