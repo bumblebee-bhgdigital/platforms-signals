@@ -95,6 +95,11 @@ Rückweg: Beschluss zu einem Agendapunkt mit `linked_object = signal` → Event 
 `outcome` nach Beschluss-Art (`measure` | `return_to_unit` | `escalation` | Strategie-Thema) und verweist auf den Beschluss.
 Ergebnis-Checks des Agendapunkts („Blockaden beseitigt“, „Einheit kann wieder selbstständig handeln“ …) fließen in den Maßstab.
 
+### 6a. Takt der Vorbereitung
+Die Vorbereitung läuft **fortwährend**, nicht an einem Tag: In jedem Takt arbeitet der Steward neue Signale sofort ab
+(lokal lösen oder als Entwurf in die nächste Sitzung heben); die Agenda wächst laufend. Kurz vor der Sitzung wird nur
+noch abgeschlossen (Lagebild, Vollständigkeit der vier Fragen, offene 4a-Bestätigungen). Nach der Sitzung: Beschlüsse nachhalten.
+
 ### 7. Lagebild
 Je Einheit (was lokal gelöst wurde, im Rahmen) und je LA-Sitzung (was ansteht, was sich zwischen Einheiten verdichtet,
 was lokal erledigt ist). Der Agent schreibt es, die Plattform füllt die Fakten vor und hängt es als Unterlage an die Sitzung.
