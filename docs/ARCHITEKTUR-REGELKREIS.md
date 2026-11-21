@@ -1,119 +1,134 @@
-# Architektur: Signale als Regelkreis zwischen Agenten und Gremien
+# Architektur: Signale im Regelkreis des BROICH.MANAGEMENTMODELLS
 
-Stand 2026-11-21 · Entwurf zur Abstimmung (Martin)
+Stand 2026-11-21 · Entwurf v2 · abgeglichen mit Academy MGT-101 („Management als System“), insbesondere
+„Der Lenkungsausschuss – lokal vor übergreifend“, „Die vier Fragen“, „Hilfe statt Macht“, „Der Regelkreis“.
 
 ## Ziel
 
-Die Gremien füllen sich von selbst. Agenten sehen Probleme und Chancen und regeln, was in ihrem Rahmen liegt, selbst.
-Was den Rahmen sprengt, landet vorbereitet im Gremium. **Der Mensch entscheidet** – er ist das Zünglein an der Waage.
-Gremien werden nicht abgeschafft, sondern entlastet: Ihre Zeit geht in Entscheidungen, nicht in Lagefeststellung.
+Die Gremien füllen sich von selbst. Agenten sehen Probleme und Chancen. Die Organisation regelt sich im Wesentlichen
+selbst – **lokal vor übergreifend**. Was die Einheit nicht allein lösen kann, kommt vorbereitet in den Lenkungsausschuss.
+**Menschen entscheiden**; Gremien werden entlastet, nicht abgeschafft. Agenten und Menschen arbeiten im Einklang.
 
-Messgröße: **Absorption** – wie viel wird auf welcher Ebene erledigt (Agent im Mandat → Gremium → Eskalation).
+Maßstab (aus MGT-101): **Ist die Organisation danach handlungsfähiger?** – so viel Selbststeuerung wie möglich,
+so viel übergreifende Regulation wie nötig.
 
-## Der Kreis
+## Grundsätze (aus dem Kurs)
+
+1. **Lokal vor übergreifend.** Was innerhalb eines Verantwortungsbereichs gelöst werden kann, wird dort gelöst.
+   Der LA beginnt, wo lokale Handlungsfähigkeit nicht mehr reicht.
+2. **Faustregel für den LA:** andere Einheiten, gemeinsame Ressourcen oder strategische Prioritäten sind betroffen.
+3. **Eskalation ist kein Versagen,** sondern professionelle Führung.
+4. **Hilfe statt Macht.** Kein „Warum habt ihr …?“, sondern „Was hindert euch? Was könnt ihr selbst? Was muss das System tun?“
+5. **Eine rote Ampel ist keine Managementfrage.** Regeln über Kennzahlen liefern Beobachtungen, keine Agendapunkte.
+6. **Rahmen statt Einzelfreigabe.** „Innerhalb dieses Rahmens entscheidet ihr selbst.“
+7. **Catchball.** Der LA ist Sensor des Modells: Zeigt eine Abweichung, dass eine Annahme der Strategie nicht trägt,
+   geht das zurück in die Strategiearbeit (Regelkreis Station 8).
+
+## Der Ablauf
 
 ```
- Wahrnehmen ──► Deuten ──► Weg wählen ──┬─► (A) Absorbieren im Mandat ──► Lagebild ──┐
- (Fakten)       (Set +    (Agent)       ├─► (B) Vorlage ans Gremium ──► Sitzung ──►│ Beschluss
-                 Agent)                 └─► (C) Sofort an einen Menschen ──────────┘   │
-      ▲                                                                                 │
-      └──────────── Rückmeldung (Auflösung, Gedächtnis, Mandat) ◄──── Umsetzung (Agent) ◄┘
+Beobachtung ──► Signal an die EINHEIT ──► lokal lösen (Einheit + ihr Agent, im Entscheidungsrahmen)
+ (Kennzahlen,        │                           │ gelöst → Signal erledigt, im Lagebild der Einheit
+  Ereignisse,        │                           │
+  Agenten, Menschen) │ Faustregel greift (andere Einheiten / Ressourcen / Prioritäten)
+                     ▼
+              LA-Punkt nach den vier Fragen (vom Agenten vorbefüllt, 4a vom Bereich bestätigt)
+                     ▼
+              Sitzung des LA (Menschen entscheiden)
+                     ├─► Maßnahme ──► Agent setzt um ──► Signal erledigt (Verweis auf Beschluss)
+                     ├─► Zurück an den Bereich ──► Signal geht mit geklärtem Rahmen zurück an die Einheit
+                     ├─► Eskalation ──► nächste Ebene (Board)
+                     └─► Annahme der Strategie trägt nicht ──► Thema fürs Strategiemeeting (Catchball)
+   Algedonisch / dringend: sofort an einen Menschen, ohne auf die Sitzung zu warten.
 ```
-
-1. **Wahrnehmen** – Fakten an Knoten: Kennzahlen der Module (Dimension Bridge, Snapshots, gibt es), **Beobachtungen**
-   (neu: Ereignisse aus Modulen, Agenten, Menschen, Umwelt).
-2. **Deuten** – Das **Set** am Knoten sagt, worauf geachtet wird (Templates). Der **Agent des Sets** entscheidet,
-   was davon ein Signal ist. Regeln bleiben als einfache, verlässliche Auslöser.
-3. **Weg wählen** – jedes Signal bekommt einen von drei Wegen:
-   - **A `absorb`** – liegt im **Mandat** des Agenten: er erledigt es selbst (Aufgabe, Rückfrage, Umplanung) und berichtet im Lagebild.
-   - **B `propose`** – sprengt den Rahmen: der Agent schreibt eine **Beschlussvorlage** (Lage, Belege, 2–3 Optionen,
-     Empfehlung); sie steht automatisch auf der Agenda der **nächsten Sitzung** des zuständigen Gremiums.
-   - **C `escalate`** – algedonisch/dringend: sofort an einen Menschen, ohne auf die Sitzung zu warten.
-4. **Entscheiden** – das Gremium entscheidet (Mensch). Die Sitzung bleibt der Ort.
-5. **Umsetzen & schließen** – Beschluss → Agent legt Folgeaufgaben an → Signal wird mit Verweis auf den Beschluss aufgelöst →
-   Gedächtnis lernt; Leitplanken-Beschlüsse verändern das Mandat.
 
 ## Bausteine
 
-### 1. Gremium = Knoten (gibt es)
-Ein Set hängt an einem Knoten; ist der Knoten ein Gremium (Management Book, `organization_entity_id`), ist das
-**zuständige Gremium** damit bekannt. Hängt das Set an einer Einheit, ist das zuständige Gremium das nächste
-Gremium der Einheit (Kind-Knoten vom Typ `board` unter der Einheit bzw. ihren Vorfahren) – konfigurierbar am Set (`committee_entity_id`).
+### 1. Beobachtungen (Rohstoff, kein Signal)
+Kennzahlen der Knoten (gibt es: Bridge, Snapshots, `mb_*`, `planner_*` …), Ereignisse aus den Modulen (Phase 3),
+Wahrnehmungen von Agenten und Menschen. Regel-Templates („Quote < 30 %“) erzeugen **Beobachtungen** am Knoten.
+Ein **Signal** entsteht erst, wenn ein Agent (oder Mensch) es in die Hilfelogik übersetzt: *Was hindert die Einheit?*
+Übergang: Bis Agenten das leisten, bleiben Regel-Treffer Signale mit Weg „offen“ an der Einheit.
 
-### 2. Mandat = Leitplanken des Gremiums (neu)
-- Das Gremium beschließt, was sein Agent allein darf: Beschluss-Art **`mandate`** („Mandat für den Agenten“) in allen
-  Gremienformaten (LA, Board, Strategiemeeting), Text = Rahmen in Klartext, z. B. „Ratchet plant Aufgaben bis 2 Tage Verzug selbst um.“
-- Aktive Mandate gehen in den Kontext des Agenten (`signals.inference.GET`). Die Plattform erzwingt nichts technisch –
-  Agenten sind attribuierte Akteure; jede Absorption verweist auf das Mandat, auf das sie sich stützt (Nachvollziehbarkeit).
-- Mit jeder Sitzung kann das Gremium das Mandat weiten oder enger ziehen → kontrolliert wachsende Selbststeuerung.
+### 2. Zuständigkeit: zuerst die Einheit
+- Jedes Signal hat eine **verantwortliche Einheit** (der Knoten selbst oder seine nächste Einheit im Baum) mit ihrem
+  Verantwortlichen (Person, „Führt an“) und ihrem Agenten (Set an der Einheit, `responsible_agent`).
+- Das Signal geht **zuerst an die Einheit**. Agent und Verantwortlicher lösen lokal im **Entscheidungsrahmen**.
+- Das zuständige **übergreifende Gremium** ist der LA über der Einheit (Gremium = Knoten; nächster LA-Knoten unter
+  den Vorfahren). Das Set der Einheit kennt es; überschreibbar am Set.
 
-### 3. Beobachtungen (neu, Phase 2)
-`signal_observations`: Fakt an einem Knoten (Quelle: Modul | Agent | Mensch | Umwelt, Code, Text, Payload, Zeitpunkt).
-Module melden Ereignisse lose gekoppelt (z. B. Book: Beschluss überfällig, Sitzung ausgefallen; Helpdesk: Eskalation).
-Beobachtungen sind **kein** Signal – sie sind Rohstoff für Templates und Agenten (Grundsatz: kein Signal im Code).
-Erste Stufe kommt ohne aus: viele Ereignisse gibt es schon als Kennzahl (`mb_*`, `planner_items_overdue`).
+### 3. Entscheidungsrahmen (statt „Agenten-Mandat“)
+- Der LA beschließt den **Rahmen einer Einheit**: Beschluss-Art `frame` („Entscheidungsrahmen“) im LA-Format, z. B.
+  „Der Bereich Event plant Personal bis 2 Wochen Vorlauf selbst um; Budget bis X frei.“
+- Der Rahmen gilt für die Einheit – Menschen und ihren Agenten. Er geht in den Kontext des Agenten; lokale Lösungen
+  verweisen darauf. Mit jeder Sitzung kann der LA den Rahmen weiten oder enger ziehen.
+- Die Plattform erzwingt nichts technisch; sie macht sichtbar, worauf sich eine lokale Lösung stützt.
 
 ### 4. Signal (gibt es, erweitert)
-Neu am Signal:
-- `route` (`absorb` | `propose` | `escalate`), `route_decided_by` (Agent/Mensch), `route_reason`
-- `committee_entity_id` (zuständiges Gremium), `due_meeting_ref` (nächste Sitzung = Frist)
-- `mandate_ref` (Beschluss, auf den sich eine Absorption stützt)
-- **Vorlage** als eigenes Objekt `signal_proposals`: Lage, Optionen [{title, consequences}], Empfehlung, Belege, Status
-  (`draft` → `on_agenda` → `decided` | `withdrawn`), Verweis auf Agendapunkt und Beschluss.
-Status-Lebenszyklus: `open` → (`absorbed` | `proposed` → `decided`) | `dismissed`. Frist = nächste Sitzung des Gremiums;
-die stündliche VSM-Eskalation bleibt nur für Weg C und für Signale ohne Gremium.
+Neu: `unit_entity_id` (verantwortliche Einheit), `stage` (`unit` | `committee` | `escalated` | `strategy`),
+`committee_entity_id`, `due_meeting_ref` (nächste LA-Sitzung = Frist, sobald im LA), `frame_ref` (Rahmen, auf den sich
+eine lokale Lösung stützt), `outcome` (`solved_locally` | `measure` | `returned_to_unit` | `escalated` | `strategy_topic` | `dismissed`).
+Die stündliche VSM-Eskalation bleibt nur für algedonische Signale und für Signale ohne Gremium.
 
-### 5. Gremien-Schnittstelle (neu, Vertrag)
-Signals definiert den Vertrag, das Management Book implementiert ihn (wie Wirkungs-Quellen bei People):
+### 5. LA-Punkt nach den vier Fragen
+Statt einer Empfehlung „von oben“ füllt der Agent einen **echten LA-Agendapunkt** vor – die Felder gibt es im Book:
+- `goal` – Was wollten wir erreichen?
+- `observation` – Was beobachten wir tatsächlich? (Belege aus dem Signal)
+- `obstacle` – Was verhindert die Zielerreichung?
+- `local_solution` – 4a: Was kann der Bereich selbst lösen? (vom Bereich bestätigt)
+- `system_support` – 4b: Wobei braucht er das Gesamtsystem?
+Regel: **Ohne 4b kein LA-Punkt** – dann bleibt es lokal. Ohne 4a droht Mikromanagement – dann zurück an den Bereich.
+Der Punkt erscheint in der Vorbereitung der nächsten LA-Sitzung als **Entwurf**; der Vorsitz kann ihn herausnehmen.
+`linked_object = signal`.
 
+### 6. Gremien-Schnittstelle (Vertrag in Signals, Umsetzung im Book)
 ```php
 interface CommitteeGateway {
-    public function committeeFor(int $entityId): ?array;              // zuständiges Gremium (id, name, entity_id, format)
-    public function nextMeeting(int $committeeEntityId): ?array;      // id, scheduled_at, status
-    public function mandates(int $committeeEntityId): array;          // aktive Mandats-Beschlüsse (id, text, since)
-    public function proposeAgendaItem(int $meetingId, array $item): array; // legt Agendapunkt an (kind decision, linked_object = signal)
-    public function attachBriefing(int $meetingId, array $doc): array;     // Lagebild als Unterlage der Sitzung
+    public function committeeAbove(int $unitEntityId): ?array;          // nächster LA über der Einheit
+    public function nextMeeting(int $committeeEntityId): ?array;
+    public function frames(int $unitEntityId): array;                   // aktive Entscheidungsrahmen der Einheit
+    public function draftAgendaItem(int $meetingId, array $fourQuestions, array $link): array; // Entwurf, kind „regulation“
+    public function attachBriefing(int $meetingId, array $doc): array;  // Lagebild als Unterlage
 }
 ```
-Rückweg: das Book löst bei einem Beschluss zu einem Agendapunkt mit `linked_object = signal` das Event
-`DecisionTaken` aus → Signals löst das Signal mit `resolution_link = Beschluss` auf und gibt dem Agenten die Umsetzung.
+Rückweg: Beschluss zu einem Agendapunkt mit `linked_object = signal` → Event `DecisionTaken(kind)` → Signals setzt
+`outcome` nach Beschluss-Art (`measure` | `return_to_unit` | `escalation` | Strategie-Thema) und verweist auf den Beschluss.
+Ergebnis-Checks des Agendapunkts („Blockaden beseitigt“, „Einheit kann wieder selbstständig handeln“ …) fließen in den Maßstab.
 
-### 6. Lagebild (neu)
-Je Gremium und Sitzung: was hat der Agent im Mandat absorbiert, welche Vorlagen liegen an, was verdichtet sich.
-Der Agent schreibt es (`signals.briefings.POST`), die Plattform hängt es als Unterlage an die Sitzung. Absorbierte Signale
-füllen den Teil „bereits erledigt“ automatisch.
+### 7. Lagebild
+Je Einheit (was lokal gelöst wurde, im Rahmen) und je LA-Sitzung (was ansteht, was sich zwischen Einheiten verdichtet,
+was lokal erledigt ist). Der Agent schreibt es, die Plattform füllt die Fakten vor und hängt es als Unterlage an die Sitzung.
 
-### 7. Gespräch in Parlan (Phase 3)
-Signale auf Weg C und Vorlagen werden zusätzlich Vorgänge in Parlan beim Zuständigen (Rückfrage, Übernahme, Erledigt).
-Signals hält Zustand und Belege; das Gespräch liegt in Parlan („das ERP chattet nicht“).
+### 8. Gespräch in Parlan (Phase 4)
+Signale an die Einheit und LA-Entwürfe werden Vorgänge in Parlan beim Verantwortlichen („das ERP chattet nicht“).
 
-### 8. Lernen (gibt es, erweitert)
-Gedächtnis aus Rückmeldungen (gibt es). Neu: Treffsicherheit je Template (Anteil absorbiert/entschieden vs. verworfen) –
-was oft danebenliegt, wird leiser bzw. fällt zur Überprüfung ins Gremium.
+### 9. Lernen
+Gedächtnis aus Rückmeldungen (gibt es). Treffsicherheit je Template; Maßstab je Einheit und Gremium:
+Anteil lokal gelöst, Anteil im LA, Ergebnis-Checks „handlungsfähiger“.
 
 ## Verantwortung der Module
 
 | Modul | Rolle |
 |---|---|
-| **Organisation** | Knoten, Beziehungen, Kennzahlen (Bridge). Keine Signal-Logik mehr (Rückbau). |
-| **Signals** | Sets, Templates, Beobachtungen, Signale, Wege, Vorlagen, Lagebild, Gedächtnis, Vertrag `CommitteeGateway`. |
-| **Management Book** | Gremien, Sitzungen, Beschlüsse, Mandate; implementiert `CommitteeGateway`; meldet Beschlüsse zurück. |
-| **Agenten** (per MCP) | Wahrnehmen, Weg wählen, absorbieren, Vorlagen und Lagebild schreiben, umsetzen. |
-| **Menschen** | Entscheiden in der Sitzung, setzen Mandate, Algedonic-Knopf. |
+| **Organisation** | Knoten, Beziehungen (Verantwortliche), Kennzahlen. Keine Signal-Logik mehr. |
+| **Signals** | Sets, Templates, Beobachtungen, Signale mit Stufe und Ausgang, Lagebild, Gedächtnis, Vertrag `CommitteeGateway`. |
+| **Management Book** | Gremien, Sitzungen, Agendapunkte nach den vier Fragen, Beschlüsse (inkl. `frame`), Ergebnis-Checks; setzt `CommitteeGateway` um. |
+| **Agenten** (MCP) | wahrnehmen, in die Hilfelogik übersetzen, lokal lösen im Rahmen, LA-Punkte vorbefüllen, Lagebild, umsetzen. |
+| **Menschen** | Bereich: 4a bestätigen, lokal führen. LA: entscheiden, Rahmen setzen, zurückgeben. Algedonic-Knopf. |
 
 ## Schritte
 
-1. **Kreis am LA mit Ratchet** (zuerst, Ziel: Sitzung 01.12.)
-   - Signal: `route`, `committee_entity_id`, `due_meeting_ref`, `mandate_ref`; `signal_proposals`
-   - `CommitteeGateway` im Book; Beschluss-Art `mandate`; Agendapunkt aus Vorlage; Rückweg Beschluss → Signal
-   - MCP: `signals.signals.PUT route=…`, `signals.proposals.POST/PUT`, Mandate + nächste Sitzung im Agenten-Kontext
-   - Set „Lenkungsausschuss“ am Knoten #39, Agent Ratchet; erstes Template auf `mb_*`-Kennzahlen (z. B. Beschlüsse überfällig)
-2. **Lagebild** als Sitzungsunterlage; Absorption sichtbar machen (Kennzahl je Gremium).
-3. **Beobachtungen** aus den Modulen; Book-Ereignisse zuerst.
-4. **Parlan** für Weg C und Vorlagen.
-5. **Rückbau Organisation** (Signal-Quelle für Brief/Übersicht), Lernen je Template.
+1. **Kreis Einheit → LA** (Ziel: LA-Sitzung 01.12.)
+   - Signal: `unit_entity_id`, `stage`, `committee_entity_id`, `due_meeting_ref`, `frame_ref`, `outcome`
+   - Book: `CommitteeGateway`, Beschluss-Art `frame` im LA-Format, Entwurfs-Agendapunkt aus den vier Fragen,
+     Rückweg Beschluss → Signal nach Beschluss-Art
+   - MCP: Signal an die Einheit / in den LA heben (mit den vier Fragen) / Ausgang; Rahmen + nächste Sitzung im Agenten-Kontext
+   - Pilot: BHG.DIGITAL-Einheiten mit Set + Agent, LA #39 mit Ratchet
+2. **Lagebild** je Einheit und LA-Sitzung; Maßstab sichtbar.
+3. **Beobachtungen** aus den Modulen; Regel-Treffer werden Beobachtungen, Agenten übersetzen.
+4. **Parlan** für Signale an die Einheit und LA-Entwürfe.
+5. **Rückbau Organisation** (Signal-Quelle für Brief/Übersicht), Catchball-Weg ins Strategiemeeting ausbauen.
 
 ## Was vom heutigen Bau bleibt
 Sets an Knoten, verantwortlicher Agent, Templates (Regel/KI), Auswertung nur wo ein Set hängt, Auflösung mit Verweis,
-Gedächtnis, Umwelt, Agenten-Arbeitsliste per MCP. Die Basis-Regeln laufen weiter als Auslöser; ihr Weg ist zunächst
-„offen“, bis ein Agent ihn wählt.
+Gedächtnis, Umwelt, Arbeitsliste per MCP. Die Basis-Regeln laufen weiter; ihre Treffer gehen an die Einheit.
