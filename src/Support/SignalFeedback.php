@@ -5,8 +5,8 @@ namespace Platform\Signals\Support;
 use Platform\Signals\Services\CircleService;
 
 /**
- * Stabile Einstiegsstelle für Gremien-Module (Management Book): meldet einen Beschluss zu einem LA-Punkt,
- * der auf ein Signal verweist. Das Book ruft das nur auf, wenn die Klasse existiert (lose Kopplung).
+ * Einstiegsstelle für Rückmeldungen aus Gremien: ein Beschluss (oder ein herausgenommener Vorschlag) zu einem
+ * Agendapunkt, der auf ein Signal verweist. Aufgerufen von HandleCommitteeEvents (Ereignisse des Books).
  */
 class SignalFeedback
 {

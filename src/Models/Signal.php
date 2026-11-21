@@ -15,7 +15,7 @@ use Symfony\Component\Uid\UuidV7;
 /**
  * @ai.description Ausgelöstes Signal (algedonischer Alarm) an einem Knoten. Entsteht aus einem Template in einem Signal-Set (Regel-Auswertung oder Agent), aus dem Algedonic-Knopf oder per Eskalation/Aggregation. Lebenszyklus: open → acknowledged → resolved | dismissed; Auflösung mit Notiz und Verweis (z. B. Beschluss, Aufgabe, Agendapunkt).
  */
-class Signal extends Model
+class Signal extends Model implements \Platform\Core\Contracts\HasDisplayName
 {
     use SoftDeletes;
 
@@ -215,6 +215,11 @@ class Signal extends Model
         return $this->relationLoaded('focuses')
             ? $this->focuses->contains('user_id', $user->id)
             : $this->focuses()->where('user_id', $user->id)->exists();
+    }
+
+    public function getDisplayName(): ?string
+    {
+        return 'Signal #' . $this->id . ': ' . mb_strimwidth(strip_tags((string) $this->message), 0, 80, '…');
     }
 
     public function isClosed(): bool

@@ -147,4 +147,24 @@ class SignalsCircleTest extends TestCase
         $frames = \Platform\Signals\Support\CommitteeGateways::get()->frames($this->ids['a']);
         $this->assertSame('Einheit A plant Personal bis 2 Wochen selbst um', $frames[0]['text']);
     }
+    public function test_rejecting_the_draft_sends_the_signal_back_to_the_unit(): void
+    {
+        $signal = $this->signalAt('a1');
+        $r = $this->tool(CreateCommitteeItemTool::class, $this->fourQuestions($signal->id), $this->s['agent']);
+        $item = ManagementBookAgendaItem::find($r->data['agenda_item']['id']);
+        \Platform\ManagementBook\Events\AgendaProposalRejected::dispatch($item, $this->s['user']->id);
+        $signal->refresh();
+        $this->assertSame('unit', $signal->stage);
+        $this->assertSame('returned_to_unit', $signal->outcome);
+    }
+
+    public function test_book_knows_nothing_about_signals(): void
+    {
+        $src = implode("\n", array_map('file_get_contents', array_merge(
+            glob(getenv('MB_MODULE_PATH') . '/src/Models/*.php'), glob(getenv('MB_MODULE_PATH') . '/src/Livewire/*/*.php'),
+            glob(getenv('MB_MODULE_PATH') . '/resources/views/livewire/*/partials/*.php'),
+        )));
+        $this->assertStringNotContainsString('Platform\\Signals', $src);
+        $this->assertStringNotContainsString('signals_signal', $src);
+    }
 }
