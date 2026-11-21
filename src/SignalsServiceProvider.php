@@ -228,8 +228,7 @@ class SignalsServiceProvider extends ServiceProvider
      */
     protected function registerSchedule(): void
     {
-        $this->app->booted(function () {
-            $schedule = $this->app->make(\Illuminate\Console\Scheduling\Schedule::class);
+        $this->callAfterResolving(\Illuminate\Console\Scheduling\Schedule::class, function (\Illuminate\Console\Scheduling\Schedule $schedule) {
             $schedule->command('signals:evaluate')->dailyAt('08:16')->withoutOverlapping();
             $schedule->command('signals:evaluate')->dailyAt('18:16')->withoutOverlapping();
             $schedule->command('signals:escalate')->hourly()->withoutOverlapping();
