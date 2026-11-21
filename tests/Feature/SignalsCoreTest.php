@@ -244,4 +244,14 @@ class SignalsCoreTest extends TestCase
         $signal->update(['deadline_at' => now()->subHour(), 'acknowledged_at' => now()]);
         $this->assertSame(0, app(\Platform\Signals\Services\SignalEscalationService::class)->run()['escalated']);
     }
+    public function test_new_responsible_agent_takes_over_open_signals(): void
+    {
+        $this->ruleTemplate();
+        app(\Platform\Signals\Services\SignalSetService::class)->update($this->set, ['responsible_agent_user_id' => null]);
+        app(SignalEvaluationService::class)->run();
+        $this->assertTrue(Signal::all()->every(fn ($s) => $s->responsible_user_id === null));
+
+        app(\Platform\Signals\Services\SignalSetService::class)->update($this->set->fresh(), ['responsible_agent_user_id' => $this->s['agent']->id]);
+        $this->assertTrue(Signal::all()->every(fn ($s) => $s->responsible_user_id === $this->s['agent']->id));
+    }
 }

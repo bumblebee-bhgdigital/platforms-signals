@@ -103,7 +103,17 @@ class SignalSetService
             $attrs['title'] = trim((string) $data['title']);
         }
 
+        $agentChanged = array_key_exists('responsible_agent_user_id', $attrs)
+            && (int) $attrs['responsible_agent_user_id'] !== (int) $set->responsible_agent_user_id;
+
         $set->fill($attrs)->save();
+
+        // Neuer verantwortlicher Agent übernimmt die offenen Signale des Sets
+        if ($agentChanged) {
+            \Platform\Signals\Models\Signal::query()->where('signal_set_id', $set->id)
+                ->whereIn('status', ['open', 'acknowledged'])
+                ->update(['responsible_user_id' => $set->responsible_agent_user_id]);
+        }
 
         return $set->refresh();
     }
