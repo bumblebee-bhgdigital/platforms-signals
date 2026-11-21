@@ -29,6 +29,10 @@
                 @svg('heroicon-o-adjustments-horizontal', 'w-4 h-4 text-[var(--nx-text)]')
                 <span class="ml-2 text-sm">Templates</span>
             </x-ui-sidebar-item>
+            <x-ui-sidebar-item :href="route('signals.environment.index')">
+                @svg('heroicon-o-globe-europe-africa', 'w-4 h-4 text-[var(--nx-text)]')
+                <span class="ml-2 text-sm">Umwelt</span>
+            </x-ui-sidebar-item>
         </x-ui-sidebar-list>
 
         {{-- Knoten-Gruppen (Entity-Typ -> Baum -> Sets) --}}

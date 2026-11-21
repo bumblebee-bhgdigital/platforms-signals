@@ -67,4 +67,30 @@ class SignalMemoryEntry extends Model
     {
         return $q->where(fn ($w) => $w->whereNull('valid_until')->orWhere('valid_until', '>', now()));
     }
+
+    public function scopeForTeam(Builder $q, int $teamId): Builder
+    {
+        return $q->where('team_id', $teamId);
+    }
+
+    public function scopeForEntity(Builder $q, int $entityId): Builder
+    {
+        return $q->where('entity_id', $entityId);
+    }
+
+    public function scopeOfType(Builder $q, string $type): Builder
+    {
+        return $q->where('memory_type', $type);
+    }
+
+    /** Bestätigen: Vertrauen erhöhen, Gültigkeit verlängern. */
+    public function reinforce(float $confidenceBoost = 0.1, ?int $extendDays = null): void
+    {
+        $this->reinforcement_count++;
+        $this->confidence = min(1.0, $this->confidence + $confidenceBoost);
+        if ($extendDays && $this->valid_until) {
+            $this->valid_until = $this->valid_until->addDays($extendDays);
+        }
+        $this->save();
+    }
 }

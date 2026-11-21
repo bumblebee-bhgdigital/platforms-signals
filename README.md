@@ -44,8 +44,15 @@ Direkt vs. vererbt: `SignalSetService::setsForNode()` bzw. `signals.signal_sets.
 - **Gedächtnis** (`SignalMemoryEntry`, `signal_memory_entries`): Rückmeldungen zu KI-Signalen (bestätigt/gelöst → baseline, verworfen → suppression)
   und Beobachtungen der Agenten; `signals.memory.GET/POST/PUT/DELETE`.
 
-MCP: `signals.templates.GET/POST/PUT/DELETE`, `signals.set_templates.PUT`, `signals.signals.GET/POST/PUT`, `signals.evaluate.POST` (Probelauf),
-`signals.inference.GET/POST`, `signals.memory.GET/POST/PUT/DELETE`.
-Oberfläche: Set-Seite (Templates, Probelauf, Signale), `/signals/signals` (Arbeitsliste + Detail), `/signals/templates`.
+- **Umwelt (VSM S4, #1046)**: `SignalEnvironmentSource`/`SignalEnvironmentSnapshot`, Abruf RSS/KPI mit Extraktion (`EnvironmentPullService`,
+  `signals:pull-environment-sources` stündlich, Intervall je Quelle), gelernte Relevanz (`source_relevance` im Gedächtnis, `signals:decay-environment-relevance`
+  wöchentlich), Kontext mit Bewegung (`EnvironmentContextService`) für KI-Templates und Agent-API `GET /api/signals/agent/environment` (Perceptor).
+- **Umzug der Verlaufsdaten**: `signals:import-organization --team=<root> [--dry-run]` übernimmt Umweltquellen + Snapshots und das Gedächtnis
+  idempotent (legacy-IDs, Umschlüsselung) und deaktiviert die alten Quellen. Regeln/Prompts/Sets werden per MCP umgezogen.
 
-Tests: `tests/run-in-taiste.sh tests/Feature/SignalsCoreTest.php tests/Feature/SignalsUiTest.php tests/Feature/SignalsInferenceTest.php`
+MCP: `signals.templates.GET/POST/PUT/DELETE`, `signals.set_templates.PUT`, `signals.signals.GET/POST/PUT`, `signals.evaluate.POST` (Probelauf),
+`signals.inference.GET/POST`, `signals.memory.GET/POST/PUT/DELETE`, `signals.environment_sources.GET/POST/PUT/DELETE`,
+`signals.environment_sources.rate`, `signals.environment_snapshots.GET`.
+Oberfläche: Set-Seite (Templates, Probelauf, Signale), `/signals/signals` (Arbeitsliste + Detail), `/signals/templates`, `/signals/environment`.
+
+Tests: `tests/run-in-taiste.sh tests/Feature/SignalsCoreTest.php tests/Feature/SignalsUiTest.php tests/Feature/SignalsInferenceTest.php tests/Feature/SignalsEnvironmentTest.php`

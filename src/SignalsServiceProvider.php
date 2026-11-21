@@ -61,6 +61,9 @@ class SignalsServiceProvider extends ServiceProvider
             $this->commands([
                 \Platform\Signals\Console\Commands\EvaluateSignalsCommand::class,
                 \Platform\Signals\Console\Commands\EscalateSignalsCommand::class,
+                \Platform\Signals\Console\Commands\PullEnvironmentSourcesCommand::class,
+                \Platform\Signals\Console\Commands\DecayEnvironmentRelevanceCommand::class,
+                \Platform\Signals\Console\Commands\ImportOrganizationDataCommand::class,
             ]);
         }
     }
@@ -133,6 +136,12 @@ class SignalsServiceProvider extends ServiceProvider
             ModuleRouter::group('signals', function () {
                 $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
             });
+
+            // Agent-API (Worker-Token, auth:api) – wie die Agent-API der Organisation
+            \Illuminate\Support\Facades\Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
+                ->middleware(['api'])
+                ->prefix('api')
+                ->group(__DIR__.'/../routes/agent.php');
             
             /**
              * API-Routes (optional)
@@ -224,6 +233,9 @@ class SignalsServiceProvider extends ServiceProvider
             $schedule->command('signals:evaluate')->dailyAt('08:16')->withoutOverlapping();
             $schedule->command('signals:evaluate')->dailyAt('18:16')->withoutOverlapping();
             $schedule->command('signals:escalate')->hourly()->withoutOverlapping();
+            // Umwelt (S4): Quellen stündlich prüfen (Intervall je Quelle entscheidet), Relevanz wöchentlich abklingen lassen
+            $schedule->command('signals:pull-environment-sources')->hourly()->withoutOverlapping();
+            $schedule->command('signals:decay-environment-relevance')->weekly()->withoutOverlapping();
         });
     }
 
@@ -302,7 +314,7 @@ class SignalsServiceProvider extends ServiceProvider
         );
     }
 
-    /** MCP-Tools: signal_sets, templates, set_templates, signals, evaluate, inference, memory. */
+    /** MCP-Tools: signal_sets, templates, set_templates, signals, evaluate, inference, memory, environment. */
     protected function registerTools(): void
     {
         try {
@@ -326,6 +338,12 @@ class SignalsServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Signals\Tools\CreateMemoryTool());
             $registry->register(new \Platform\Signals\Tools\UpdateMemoryTool());
             $registry->register(new \Platform\Signals\Tools\DeleteMemoryTool());
+            $registry->register(new \Platform\Signals\Tools\ListEnvironmentSourcesTool());
+            $registry->register(new \Platform\Signals\Tools\CreateEnvironmentSourceTool());
+            $registry->register(new \Platform\Signals\Tools\UpdateEnvironmentSourceTool());
+            $registry->register(new \Platform\Signals\Tools\DeleteEnvironmentSourceTool());
+            $registry->register(new \Platform\Signals\Tools\RateEnvironmentSourceTool());
+            $registry->register(new \Platform\Signals\Tools\ListEnvironmentSnapshotsTool());
         } catch (\Throwable $e) {
             // ToolRegistry nicht verfügbar
         }
