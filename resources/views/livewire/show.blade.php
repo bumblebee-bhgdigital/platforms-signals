@@ -1,6 +1,5 @@
 {{--
-    Detailseite Signal-Set (nx-Design-System): Eigenschaften + Platzhalter-Bereiche.
-    Definitionen / Kennzahlen / ausgelöste Signale / Agent folgen in eigenen Boards und docken hier an.
+    Detailseite Signal-Set (nx-Design-System): Eigenschaften, Templates (mit Probelauf), ausgelöste Signale.
 --}}
 
 <x-ui-page>
@@ -109,21 +108,122 @@
             <x-nx-property-row icon="heroicon-o-cpu-chip" label="Verantwortlicher Agent">{{ $set->responsibleAgent?->name ?? '–' }}</x-nx-property-row>
         </x-nx-card>
 
-        {{-- Platzhalter-Bereiche (folgen in eigenen Boards) --}}
-        <x-nx-section icon="heroicon-o-adjustments-horizontal" title="Definitionen" description="Signaldefinitionen: Quellen, Schwellwerte, Frequenz und Eskalation.">
-            <x-nx-card><x-nx-empty icon="heroicon-o-adjustments-horizontal">Noch keine Definitionen — dieser Bereich folgt in einem eigenen Board.</x-nx-empty></x-nx-card>
+        @php($P = \Platform\Signals\Support\SignalPresenter::class)
+
+        {{-- Templates im Set --}}
+        <x-nx-section icon="heroicon-o-adjustments-horizontal" title="Templates" :hint="$assignments->count()"
+                      description="Worauf das Set achtet. Regeln wertet die Plattform nach jedem Snapshot an den Knoten des Sets aus, KI-Templates der verantwortliche Agent.">
+            <x-slot name="action">
+                <x-nx-button variant="secondary" size="sm" wire:click="runDryRun">@svg('heroicon-o-beaker', 'w-4 h-4') Probelauf</x-nx-button>
+            </x-slot>
+
+            @if($dryRun)
+                <x-nx-callout :variant="isset($dryRun['error']) ? 'warning' : 'info'" icon="heroicon-o-beaker" title="Probelauf (nichts gespeichert)">
+                    @isset($dryRun['error'])
+                        {{ $dryRun['error'] }}
+                    @else
+                        {{ $dryRun['nodes'] }} Knoten im Geltungsbereich · {{ $dryRun['created'] }} neue Signale · {{ $dryRun['resolved'] }} würden sich auflösen.
+                        @foreach($dryRun['rows'] as $row)
+                            <div class="mt-2">
+                                <div class="font-medium">{{ $row['template'] }}</div>
+                                @if($row['error'])<div class="text-[color:var(--nx-danger)]">{{ $row['error'] }}</div>@endif
+                                @forelse($row['hits'] as $hit)
+                                    <div class="text-xs">· {{ $hit }}</div>
+                                @empty
+                                    <div class="text-xs text-[color:var(--nx-muted)]">schlägt nirgends an</div>
+                                @endforelse
+                            </div>
+                        @endforeach
+                    @endisset
+                </x-nx-callout>
+            @endif
+
+            @if($assignments->isEmpty())
+                <x-nx-card><x-nx-empty icon="heroicon-o-adjustments-horizontal">Noch keine Templates im Set.</x-nx-empty></x-nx-card>
+            @else
+                <x-nx-card flush>
+                    <x-nx-table>
+                        <x-nx-table-header>
+                            <x-nx-table-header-cell>Template</x-nx-table-header-cell>
+                            <x-nx-table-header-cell>Regel / Auswertung</x-nx-table-header-cell>
+                            <x-nx-table-header-cell>Schwere</x-nx-table-header-cell>
+                            <x-nx-table-header-cell>Takt</x-nx-table-header-cell>
+                            <x-nx-table-header-cell align="right">Zuletzt</x-nx-table-header-cell>
+                        </x-nx-table-header>
+                        <x-nx-table-body>
+                            @foreach($assignments as $a)
+                                <x-nx-table-row wire:key="tpl-{{ $a->id }}">
+                                    <x-nx-table-cell>
+                                        <span class="{{ $a->is_active ? '' : 'line-through text-[color:var(--nx-muted)]' }}">{{ $a->template->name }}</span>
+                                        <x-nx-badge variant="neutral">{{ $a->template->isRule() ? ($P::PATTERN_LABELS[$a->template->pattern_type] ?? 'Regel') : 'KI' }}</x-nx-badge>
+                                        @if($a->conditions_override || $a->severity_override || $a->frequency_override || $a->schedule_interval_hours_override)
+                                            <x-nx-badge variant="info" title="Für dieses Set angepasst">angepasst</x-nx-badge>
+                                        @endif
+                                        @can('update', $set)
+                                            <div class="mt-1 flex gap-3 text-xs">
+                                                <button type="button" wire:click="toggleTemplate({{ $a->id }})" class="text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] underline">{{ $a->is_active ? 'Pausieren' : 'Fortsetzen' }}</button>
+                                                <button type="button" wire:click="removeTemplate({{ $a->id }})" wire:confirm="Template aus dem Set nehmen?" class="text-[color:var(--nx-muted)] hover:text-[color:var(--nx-danger)] underline">Entfernen</button>
+                                            </div>
+                                        @endcan
+                                    </x-nx-table-cell>
+                                    <x-nx-table-cell><span class="text-xs font-mono">{{ $P::assignment($a) }}</span></x-nx-table-cell>
+                                    <x-nx-table-cell><x-nx-badge :variant="$P::severityVariant($a->effectiveSeverity())">{{ $P::SEVERITY_LABELS[$a->effectiveSeverity()] ?? $a->effectiveSeverity() }}</x-nx-badge></x-nx-table-cell>
+                                    <x-nx-table-cell><span class="text-xs">{{ $P::cadence($a) }}</span></x-nx-table-cell>
+                                    <x-nx-table-cell align="right">
+                                        <span class="text-xs text-[color:var(--nx-muted)]">{{ $a->last_evaluated_at?->diffForHumans() ?? 'noch nie' }}</span>
+                                        @if($a->last_error)<div class="text-xs text-[color:var(--nx-danger)]" title="{{ $a->last_error }}">Fehler</div>@endif
+                                    </x-nx-table-cell>
+                                </x-nx-table-row>
+                            @endforeach
+                        </x-nx-table-body>
+                    </x-nx-table>
+                </x-nx-card>
+            @endif
+
+            @can('update', $set)
+                @if($availableTemplates->isNotEmpty())
+                    <div class="mt-3 flex items-end gap-2">
+                        <div class="grow">
+                            <x-nx-input-select name="addTemplateId" size="sm" wire:model="addTemplateId" nullable="true" nullLabel="Template hinzufügen …"
+                                               :options="$availableTemplates->map(fn ($t) => ['value' => $t->id, 'label' => $t->name . ($t->kind === 'inference' ? ' (KI)' : '')])->all()" />
+                        </div>
+                        <x-nx-button variant="secondary" size="sm" wire:click="addTemplate">Hinzufügen</x-nx-button>
+                    </div>
+                @endif
+                <p class="mt-2 text-xs text-[color:var(--nx-muted)]">Neue Templates und Schwellen je Set: <a href="{{ route('signals.templates.index') }}" wire:navigate class="underline">Templates</a> bzw. per MCP <code>signals.set_templates.PUT</code>.</p>
+            @endcan
         </x-nx-section>
 
-        <x-nx-section icon="heroicon-o-chart-bar" title="Kennzahlen" description="Kennzahlen, auf denen die Signale beruhen.">
-            <x-nx-card><x-nx-empty icon="heroicon-o-chart-bar">Noch keine Kennzahlen — dieser Bereich folgt in einem eigenen Board.</x-nx-empty></x-nx-card>
-        </x-nx-section>
-
-        <x-nx-section icon="heroicon-o-bell-alert" title="Ausgelöste Signale" description="Signale, die aus diesem Set ausgelöst wurden.">
-            <x-nx-card><x-nx-empty icon="heroicon-o-bell-alert">Noch keine ausgelösten Signale — dieser Bereich folgt in einem eigenen Board.</x-nx-empty></x-nx-card>
-        </x-nx-section>
-
-        <x-nx-section icon="heroicon-o-cpu-chip" title="Agent" description="Verantwortlicher Agent, der das Set überwacht und eskaliert.">
-            <x-nx-card><x-nx-empty icon="heroicon-o-cpu-chip">Agent-Anbindung folgt in einem eigenen Board.</x-nx-empty></x-nx-card>
+        {{-- Ausgelöste Signale --}}
+        <x-nx-section icon="heroicon-o-bell-alert" title="Ausgelöste Signale" :hint="$signals->count()"
+                      description="Offene und gesehene Signale aus diesem Set{{ $closedCount ? ' · ' . $closedCount . ' erledigt/verworfen' : '' }}.">
+            @if($signals->isEmpty())
+                <x-nx-card><x-nx-empty icon="heroicon-o-bell-alert">Keine offenen Signale.</x-nx-empty></x-nx-card>
+            @else
+                <x-nx-card flush>
+                    <x-nx-table>
+                        <x-nx-table-header>
+                            <x-nx-table-header-cell>Signal</x-nx-table-header-cell>
+                            <x-nx-table-header-cell>Knoten</x-nx-table-header-cell>
+                            <x-nx-table-header-cell>Status</x-nx-table-header-cell>
+                            <x-nx-table-header-cell align="right">Seit</x-nx-table-header-cell>
+                        </x-nx-table-header>
+                        <x-nx-table-body>
+                            @foreach($signals as $signal)
+                                <x-nx-table-row wire:key="sig-{{ $signal->id }}" :href="route('signals.signals.show', $signal)">
+                                    <x-nx-table-cell>
+                                        <x-nx-badge :variant="$P::severityVariant($signal->severity)">{{ $P::SEVERITY_LABELS[$signal->severity] ?? $signal->severity }}</x-nx-badge>
+                                        <span class="text-sm">{{ \Illuminate\Support\Str::limit($signal->message, 110) }}</span>
+                                    </x-nx-table-cell>
+                                    <x-nx-table-cell>{{ $signal->entity?->name ?? '#' . $signal->entity_id }}</x-nx-table-cell>
+                                    <x-nx-table-cell><x-nx-badge :variant="$P::statusVariant($signal->status)" dot>{{ $P::STATUS_LABELS[$signal->status] ?? $signal->status }}</x-nx-badge></x-nx-table-cell>
+                                    <x-nx-table-cell align="right"><span class="text-xs text-[color:var(--nx-muted)]">{{ $signal->created_at?->diffForHumans() }}</span></x-nx-table-cell>
+                                </x-nx-table-row>
+                            @endforeach
+                        </x-nx-table-body>
+                    </x-nx-table>
+                </x-nx-card>
+            @endif
         </x-nx-section>
     </x-ui-page-container>
 

@@ -80,6 +80,16 @@ trait HandlesSignalSets
                 array_keys($assignments),
                 array_values($assignments)
             ),
+            'templates' => $set->templateAssignments()->with('template')->get()->map(fn ($a) => [
+                'signal_template_id' => $a->signal_template_id,
+                'name' => $a->template?->name,
+                'kind' => $a->template?->kind,
+                'is_active' => $a->is_active,
+                'severity' => $a->effectiveSeverity(),
+                'has_override' => (bool) ($a->conditions_override || $a->severity_override || $a->frequency_override || $a->schedule_interval_hours_override),
+                'last_evaluated_at' => $a->last_evaluated_at?->toIso8601String(),
+            ])->values()->all(),
+            'open_signals' => $set->signals()->whereIn('status', ['open', 'acknowledged'])->count(),
             'created_at' => $set->created_at?->toIso8601String(),
             'updated_at' => $set->updated_at?->toIso8601String(),
         ];

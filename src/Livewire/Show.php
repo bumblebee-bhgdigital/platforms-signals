@@ -3,8 +3,8 @@
 /**
  * Show Livewire Component — Detailseite eines Signal-Sets.
  *
- * Eigenschaften (Knoten mit Vererbung, Owner, Agent) plus Platzhalter-Bereiche für Definitionen,
- * Kennzahlen, ausgelöste Signale und Agent (Messlogik folgt in eigenen Boards).
+ * Eigenschaften (Knoten mit Vererbung, Owner, Agent), Templates im Set (mit wirksamen Einstellungen,
+ * Probelauf) und die aus dem Set ausgelösten Signale.
  */
 
 namespace Platform\Signals\Livewire;
@@ -29,6 +29,9 @@ class Show extends Component
 
     public bool $showEdit = false;
     public array $form = [];
+
+    public ?int $addTemplateId = null;
+    public ?array $dryRun = null;
 
     public function mount(SignalSet $signalSet): void
     {
@@ -126,6 +129,58 @@ class Show extends Component
         return $this->redirect(route('signals.dashboard'), navigate: true);
     }
 
+    public function addTemplate(): void
+    {
+        Gate::authorize('update', $this->signalSet);
+        $template = \Platform\Signals\Models\SignalTemplate::query()->where('team_id', $this->signalSet->team_id)->find((int) $this->addTemplateId);
+        if (! $template) {
+            return;
+        }
+        app(\Platform\Signals\Services\SignalTemplateService::class)->attach($this->signalSet, $template, [
+            'position' => (int) $this->signalSet->templateAssignments()->max('position') + 1,
+        ]);
+        $this->addTemplateId = null;
+        $this->dryRun = null;
+    }
+
+    public function toggleTemplate(int $assignmentId): void
+    {
+        Gate::authorize('update', $this->signalSet);
+        $a = $this->signalSet->templateAssignments()->whereKey($assignmentId)->first();
+        $a?->update(['is_active' => ! $a->is_active]);
+        $this->dryRun = null;
+    }
+
+    public function removeTemplate(int $assignmentId): void
+    {
+        Gate::authorize('update', $this->signalSet);
+        $this->signalSet->templateAssignments()->whereKey($assignmentId)->delete();
+        $this->dryRun = null;
+    }
+
+    /** Probelauf: was würde jetzt anschlagen? Schreibt nichts. */
+    public function runDryRun(): void
+    {
+        Gate::authorize('view', $this->signalSet);
+        if (! $this->signalSet->isActive()) {
+            $this->dryRun = ['error' => 'Das Set ist nicht aktiv – ausgewertet wird erst nach dem Aktivieren.'];
+
+            return;
+        }
+        $report = app(\Platform\Signals\Services\SignalEvaluationService::class)->run($this->signalSet->id, true, true);
+        $names = OrganizationEntity::whereIn('id', collect($report['results'])->pluck('triggered')->flatten(1)->pluck('entity_id')->filter()->all())->pluck('name', 'id');
+        $this->dryRun = [
+            'created' => $report['created'],
+            'resolved' => $report['resolved'],
+            'nodes' => count(app(\Platform\Signals\Services\SignalEvaluationService::class)->scopeEntityIds($this->signalSet)),
+            'rows' => collect($report['results'])->map(fn ($r) => [
+                'template' => $r['template'] ?? ('#' . ($r['template_id'] ?? '?')),
+                'error' => $r['error'] ?? null,
+                'hits' => collect($r['triggered'] ?? [])->map(fn ($t) => ($names[$t['entity_id']] ?? '#' . $t['entity_id']) . ' – ' . $t['message'])->all(),
+            ])->all(),
+        ];
+    }
+
     protected function afterLinkChange(): void
     {
         $this->cancelLinking();
@@ -146,10 +201,22 @@ class Show extends Component
             'inherit' => $inherit,
         ])->filter(fn ($n) => $n['entity'])->values();
 
+        $assignments = $set->templateAssignments()->with('template')->get()->filter(fn ($a) => $a->template)->values();
+        $available = \Platform\Signals\Models\SignalTemplate::query()->where('team_id', $set->team_id)->where('is_active', true)
+            ->whereNotIn('id', $assignments->pluck('signal_template_id'))->orderBy('kind')->orderBy('name')->get(['id', 'name', 'kind']);
+
+        $signals = $set->signals()->whereIn('status', ['open', 'acknowledged'])->with('entity:id,name')
+            ->orderByRaw("CASE severity WHEN 'algedonic' THEN 0 WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 ELSE 3 END")
+            ->orderByDesc('created_at')->limit(50)->get();
+
         return view('signals::livewire.show', [
             'set' => $set,
             'nodes' => $nodes,
             'linkCandidates' => $this->linkCandidates(),
+            'assignments' => $assignments,
+            'availableTemplates' => $available,
+            'signals' => $signals,
+            'closedCount' => $set->signals()->whereIn('status', ['resolved', 'dismissed'])->count(),
         ])->layout('platform::layouts.app');
     }
 }

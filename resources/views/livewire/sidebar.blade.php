@@ -19,6 +19,18 @@
     </div>
 
     <div class="mt-2" x-show="!collapsed">
+        <x-ui-sidebar-list label="Arbeiten">
+            <x-ui-sidebar-item :href="route('signals.signals.index')">
+                @svg('heroicon-o-exclamation-triangle', 'w-4 h-4 text-[var(--nx-text)]')
+                <span class="ml-2 text-sm">Signale</span>
+                @if($openSignals > 0)<span class="ml-auto text-xs text-[var(--nx-muted)]">{{ $openSignals }}</span>@endif
+            </x-ui-sidebar-item>
+            <x-ui-sidebar-item :href="route('signals.templates.index')">
+                @svg('heroicon-o-adjustments-horizontal', 'w-4 h-4 text-[var(--nx-text)]')
+                <span class="ml-2 text-sm">Templates</span>
+            </x-ui-sidebar-item>
+        </x-ui-sidebar-list>
+
         {{-- Knoten-Gruppen (Entity-Typ -> Baum -> Sets) --}}
         @foreach($entityTypeGroups as $typeGroup)
             <x-ui-sidebar-list wire:key="sg-type-group-{{ $typeGroup['type_id'] }}" :label="$typeGroup['type_name']">

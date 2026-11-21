@@ -32,6 +32,21 @@ return [
      */
     'guard' => 'web',
 
+    /*
+     * Wie lange darf ein Signal auf einer VSM-Ebene offen liegen, bevor die Eskalation es eine Stufe
+     * höher zieht (Stunden). Algedonic: Schmerz-Kanal nach Beer, extrem kurz.
+     */
+    'deadlines' => [
+        'default' => 168,
+        's1' => 24,
+        's2' => 48,
+        's3' => 72,
+        's3_star' => 72,
+        's4' => 168,
+        's5' => 336,
+        'algedonic' => 1,
+    ],
+
     /**
      * Navigation-Konfiguration
      * 
@@ -74,6 +89,16 @@ return [
                     'label' => 'Übersicht',
                     'route' => 'signals.dashboard',
                     'icon'  => 'heroicon-o-bell-alert',
+                ],
+                [
+                    'label' => 'Signale',
+                    'route' => 'signals.signals.index',
+                    'icon'  => 'heroicon-o-exclamation-triangle',
+                ],
+                [
+                    'label' => 'Templates',
+                    'route' => 'signals.templates.index',
+                    'icon'  => 'heroicon-o-adjustments-horizontal',
                 ],
                 [
                     'label' => 'nx-Showcase',

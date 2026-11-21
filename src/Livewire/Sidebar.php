@@ -42,6 +42,7 @@ class Sidebar extends Component
             'entityTypeGroups' => collect(),
             'unlinkedSets' => collect(),
             'linkCandidates' => [],
+            'openSignals' => 0,
         ];
 
         if (! $user || ! $teamId) {
@@ -167,6 +168,7 @@ class Sidebar extends Component
             'entityTypeGroups' => $entityTypeGroups,
             'unlinkedSets' => $sets->reject(fn ($s) => in_array($s->id, $linkedSetIds, true))->values(),
             'linkCandidates' => $this->linkCandidates(),
+            'openSignals' => \Platform\Signals\Models\Signal::query()->whereIn('team_id', $this->relevantTeamIds($user))->actionable()->count(),
         ]);
     }
 }

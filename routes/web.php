@@ -21,6 +21,9 @@
 use Platform\Signals\Livewire\Dashboard;
 use Platform\Signals\Livewire\Show;
 use Platform\Signals\Livewire\Showcase;
+use Platform\Signals\Livewire\Signal\Index as SignalIndex;
+use Platform\Signals\Livewire\Signal\Show as SignalShow;
+use Platform\Signals\Livewire\Template\Index as TemplateIndex;
 
 /**
  * Dashboard Route
@@ -33,6 +36,11 @@ Route::get('/', Dashboard::class)->name('signals.dashboard');
 // {signalSet} = Route-Model-Binding auf die ID (wie {plannerProject} im Planner).
 Route::get('/sets', Dashboard::class)->name('signals.sets.index');
 Route::get('/sets/{signalSet}', Show::class)->name('signals.sets.show');
+
+// Ausgelöste Signale (Arbeitsliste + Detail) und Templates
+Route::get('/signals', SignalIndex::class)->name('signals.signals.index');
+Route::get('/signals/{signal}', SignalShow::class)->name('signals.signals.show');
+Route::get('/templates', TemplateIndex::class)->name('signals.templates.index');
 
 /**
  * nx-Showcase Route

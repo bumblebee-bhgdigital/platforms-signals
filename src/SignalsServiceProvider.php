@@ -57,17 +57,12 @@ class SignalsServiceProvider extends ServiceProvider
          */
         $this->mergeConfigFrom(__DIR__.'/../config/signals.php', 'signals');
         
-        /**
-         * Commands registrieren (optional)
-         * 
-         * Falls dein Modul Artisan Commands hat:
-         * 
-         * if ($this->app->runningInConsole()) {
-         *     $this->commands([
-         *         \Platform\Signals\Console\Commands\YourCommand::class,
-         *     ]);
-         * }
-         */
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                \Platform\Signals\Console\Commands\EvaluateSignalsCommand::class,
+                \Platform\Signals\Console\Commands\EscalateSignalsCommand::class,
+            ]);
+        }
     }
 
     /**
@@ -203,6 +198,33 @@ class SignalsServiceProvider extends ServiceProvider
         $this->registerPolicies();
         $this->registerEntityLinkProvider();
         $this->registerTools();
+        $this->registerAlgedonicListener();
+        $this->registerSchedule();
+    }
+
+    /** Algedonic-Kanal (Beer): Core dispatcht, Signals erzeugt das Signal. */
+    protected function registerAlgedonicListener(): void
+    {
+        if (class_exists(\Platform\Core\Events\AlgedonicTriggered::class)) {
+            \Illuminate\Support\Facades\Event::listen(
+                \Platform\Core\Events\AlgedonicTriggered::class,
+                \Platform\Signals\Listeners\HandleAlgedonicTriggered::class,
+            );
+        }
+    }
+
+    /**
+     * Auswertung nach dem Snapshot der Organisation (08:00 / 18:00), Eskalation stündlich.
+     * Der Takt je Template (every_snapshot | daily | weekly) entscheidet, was jeweils dran ist.
+     */
+    protected function registerSchedule(): void
+    {
+        $this->app->booted(function () {
+            $schedule = $this->app->make(\Illuminate\Console\Scheduling\Schedule::class);
+            $schedule->command('signals:evaluate')->dailyAt('08:16')->withoutOverlapping();
+            $schedule->command('signals:evaluate')->dailyAt('18:16')->withoutOverlapping();
+            $schedule->command('signals:escalate')->hourly()->withoutOverlapping();
+        });
     }
 
     /**
@@ -262,11 +284,12 @@ class SignalsServiceProvider extends ServiceProvider
         }
     }
 
-    /** Morph-Alias `signal_set` (DimensionLinks, EntityLinkProvider, Authz). */
+    /** Morph-Aliase `signal_set` (DimensionLinks, EntityLinkProvider, Authz) und `signal` (Verweise, z. B. Agendapunkt → Signal). */
     protected function registerMorphMap(): void
     {
         Relation::morphMap([
             \Platform\Signals\Models\SignalSet::MORPH_ALIAS => \Platform\Signals\Models\SignalSet::class,
+            \Platform\Signals\Models\Signal::MORPH_ALIAS => \Platform\Signals\Models\Signal::class,
         ]);
     }
 
@@ -279,7 +302,7 @@ class SignalsServiceProvider extends ServiceProvider
         );
     }
 
-    /** MCP-Tools signals.signal_sets.GET/POST/PUT/DELETE in der Tool-Registry. */
+    /** MCP-Tools: signal_sets, templates, set_templates, signals, evaluate. */
     protected function registerTools(): void
     {
         try {
@@ -288,6 +311,15 @@ class SignalsServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Signals\Tools\CreateSignalSetTool());
             $registry->register(new \Platform\Signals\Tools\UpdateSignalSetTool());
             $registry->register(new \Platform\Signals\Tools\DeleteSignalSetTool());
+            $registry->register(new \Platform\Signals\Tools\ListSignalTemplatesTool());
+            $registry->register(new \Platform\Signals\Tools\CreateSignalTemplateTool());
+            $registry->register(new \Platform\Signals\Tools\UpdateSignalTemplateTool());
+            $registry->register(new \Platform\Signals\Tools\DeleteSignalTemplateTool());
+            $registry->register(new \Platform\Signals\Tools\UpsertSetTemplateTool());
+            $registry->register(new \Platform\Signals\Tools\ListSignalsTool());
+            $registry->register(new \Platform\Signals\Tools\CreateSignalTool());
+            $registry->register(new \Platform\Signals\Tools\UpdateSignalTool());
+            $registry->register(new \Platform\Signals\Tools\EvaluateSignalsTool());
         } catch (\Throwable $e) {
             // ToolRegistry nicht verfügbar
         }

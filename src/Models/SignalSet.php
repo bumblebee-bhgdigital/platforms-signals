@@ -20,7 +20,7 @@ use Symfony\Component\Uid\UuidV7;
  * wie PlannerProject, aber mit mehreren Knoten pro Set. Die Vererbungs-Option je Zuordnung liegt
  * in `signal_set_nodes` (SignalSetNode). Verknüpfen/Lösen/Umhängen laufen über SignalSetService.
  *
- * Messlogik (Definitionen, Kennzahlen, ausgelöste Signale) folgt in eigenen Boards.
+ * Messlogik: Templates (SignalSetTemplate) werden an den Knoten des Sets ausgewertet, ausgelöste Signale landen beim verantwortlichen Agenten (SignalEvaluationService).
  *
  * @property-read string $uuid
  */
@@ -84,6 +84,18 @@ class SignalSet extends Model implements HasDisplayName
     public function creator(): BelongsTo
     {
         return $this->belongsTo(\Platform\Core\Models\User::class, 'created_by_user_id');
+    }
+
+    /** Templates im Set (mit Overrides je Zuordnung). */
+    public function templateAssignments(): HasMany
+    {
+        return $this->hasMany(SignalSetTemplate::class, 'signal_set_id')->orderBy('position')->orderBy('id');
+    }
+
+    /** Aus diesem Set ausgelöste Signale. */
+    public function signals(): HasMany
+    {
+        return $this->hasMany(Signal::class, 'signal_set_id');
     }
 
     /** Zuordnungs-Einstellungen je Knoten (Vererbung nach unten). */
