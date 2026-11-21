@@ -302,7 +302,7 @@ class SignalsServiceProvider extends ServiceProvider
         );
     }
 
-    /** MCP-Tools: signal_sets, templates, set_templates, signals, evaluate. */
+    /** MCP-Tools: signal_sets, templates, set_templates, signals, evaluate, inference, memory. */
     protected function registerTools(): void
     {
         try {
@@ -320,6 +320,12 @@ class SignalsServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Signals\Tools\CreateSignalTool());
             $registry->register(new \Platform\Signals\Tools\UpdateSignalTool());
             $registry->register(new \Platform\Signals\Tools\EvaluateSignalsTool());
+            $registry->register(new \Platform\Signals\Tools\GetInferenceWorkTool());
+            $registry->register(new \Platform\Signals\Tools\RecordInferenceOutcomeTool());
+            $registry->register(new \Platform\Signals\Tools\ListMemoryTool());
+            $registry->register(new \Platform\Signals\Tools\CreateMemoryTool());
+            $registry->register(new \Platform\Signals\Tools\UpdateMemoryTool());
+            $registry->register(new \Platform\Signals\Tools\DeleteMemoryTool());
         } catch (\Throwable $e) {
             // ToolRegistry nicht verfügbar
         }

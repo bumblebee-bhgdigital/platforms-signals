@@ -124,12 +124,51 @@ class SignalService
         }
 
         $signal->update($update);
+        $this->recordFeedback($signal, $action, $reason, $note, $by);
 
         if (trim((string) ($opts['comment'] ?? '')) !== '') {
             $this->comment($signal, (string) $opts['comment'], $by);
         }
 
         return $signal->fresh();
+    }
+
+    /**
+     * Lernschleife (wie bisher in der Organisation): Rückmeldungen zu KI-Signalen landen im Gedächtnis.
+     * bestätigt/gelöst → baseline, verworfen → suppression (mit Grund). Regel-Signale lernen nicht.
+     */
+    protected function recordFeedback(Signal $signal, string $action, string $reason, string $note, ?User $by): void
+    {
+        if ($action === 'reopen' || $signal->source_type !== Signal::SOURCE_TYPE_INFERENCE || ! $signal->signal_template_id) {
+            return;
+        }
+        try {
+            $content = match ($action) {
+                'acknowledge' => 'Signal bestätigt: ' . mb_substr($signal->message, 0, 500),
+                'resolve' => 'Signal gelöst: ' . mb_substr($signal->message, 0, 400) . ($note !== '' ? ' – ' . mb_substr($note, 0, 300) : ''),
+                'dismiss' => $reason !== '' ? 'Signal verworfen: ' . $reason : 'Signal verworfen (ohne Begründung): ' . mb_substr($signal->message, 0, 300),
+            };
+            \Platform\Signals\Models\SignalMemoryEntry::create([
+                'team_id' => $signal->team_id,
+                'entity_id' => $signal->entity_id,
+                'signal_template_id' => $signal->signal_template_id,
+                'signal_id' => $signal->id,
+                'memory_type' => $action === 'dismiss' ? 'suppression' : 'baseline',
+                'content' => $content,
+                'structured_data' => array_filter([
+                    'signal_id' => $signal->id,
+                    'severity' => $signal->severity,
+                    'resolved' => $action === 'resolve' ?: null,
+                    'reason' => $reason ?: null,
+                ], fn ($v) => $v !== null),
+                'confidence' => 0.9,
+                'source_type' => 'signal_feedback',
+                'created_by_user_id' => $by?->id,
+                'is_active' => true,
+            ]);
+        } catch (\Throwable) {
+            // Gedächtnis darf die Bearbeitung nie blockieren
+        }
     }
 
     public function assign(Signal $signal, ?int $assigneeEntityId): Signal
