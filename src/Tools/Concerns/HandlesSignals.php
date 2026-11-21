@@ -74,7 +74,7 @@ trait HandlesSignals
     /** @return array<string,mixed> */
     protected function signalToArray(Signal $s, bool $detail = false): array
     {
-        $names = $this->entityNames(array_filter([$s->entity_id, $s->assignee_entity_id, $s->perspective_entity_id, $s->current_owner_entity_id, $s->created_by_agent_entity_id]));
+        $names = $this->entityNames(array_filter([$s->entity_id, $s->assignee_entity_id, $s->perspective_entity_id, $s->current_owner_entity_id, $s->created_by_agent_entity_id, $s->unit_entity_id, $s->committee_entity_id]));
 
         $out = [
             'id' => $s->id,
@@ -92,6 +92,16 @@ trait HandlesSignals
             'signal_template_id' => $s->signal_template_id,
             'template' => $s->template?->name,
             'template_kind' => $s->template?->kind,
+            'unit_entity_id' => $s->unit_entity_id,
+            'unit_name' => $names[$s->unit_entity_id] ?? null,
+            'stage' => $s->stage,
+            'committee_entity_id' => $s->committee_entity_id,
+            'committee_name' => $names[$s->committee_entity_id] ?? null,
+            'meeting_ref_id' => $s->meeting_ref_id,
+            'due_at' => $s->due_at?->toIso8601String(),
+            'agenda_ref' => $s->agenda_ref_id ? ['type' => $s->agenda_ref_type, 'id' => $s->agenda_ref_id] : null,
+            'frame_ref_id' => $s->frame_ref_id,
+            'outcome' => $s->outcome,
             'responsible_user_id' => $s->responsible_user_id,
             'responsible' => $s->responsible?->name,
             'assignee_entity_id' => $s->assignee_entity_id,

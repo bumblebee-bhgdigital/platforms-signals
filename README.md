@@ -56,3 +56,14 @@ MCP: `signals.templates.GET/POST/PUT/DELETE`, `signals.set_templates.PUT`, `sign
 Oberfläche: Set-Seite (Templates, Probelauf, Signale), `/signals/signals` (Arbeitsliste + Detail), `/signals/templates`, `/signals/environment`.
 
 Tests: `tests/run-in-taiste.sh tests/Feature/SignalsCoreTest.php tests/Feature/SignalsUiTest.php tests/Feature/SignalsInferenceTest.php tests/Feature/SignalsEnvironmentTest.php`
+
+## Regelkreis Einheit → Lenkungsausschuss (Architektur v2, `docs/ARCHITEKTUR-REGELKREIS.md`)
+
+- Jedes neue Signal gehört zuerst seiner **verantwortlichen Einheit** (`unit_entity_id`: nächster Knoten mit „Führt an“, kein Ordner/Gremium), `stage=unit`.
+- **Lokal lösen**: `signals.signals.PUT action=solve_locally` (resolution_note, optional frame_id) → `outcome=solved_locally`.
+- **In den LA heben** (Faustregel: andere Einheiten, gemeinsame Ressourcen, strategische Prioritäten): `signals.committee_items.POST` mit den vier Fragen
+  (goal, observation, obstacle, local_solution = 4a, system_support = 4b; ohne 4b kein LA-Punkt) → Entwurf eines Agendapunkts in der nächsten Sitzung
+  des LA über der Einheit; `stage=committee`, Frist = Sitzung.
+- **Rückweg**: Beschluss zum Agendapunkt → `SignalFeedback::decision` → measure/frame erledigt, return_to_unit zurück an die Einheit, escalation, strategy_topic.
+- **Lage** für den Steward: `signals.committee_items.GET committee_entity_id=…` (nächste Sitzung, Signale im LA, Kandidaten mit Verantwortlichem und Rahmen).
+- Gremien-Brücke `Contracts\CommitteeGateway` (umgesetzt vom Management Book), Registry `Support\CommitteeGateways`. Morph-Alias des Signals: `signals_signal`.

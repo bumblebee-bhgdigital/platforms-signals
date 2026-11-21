@@ -140,4 +140,40 @@ trait SignalsHarness
         file_put_contents($layoutDir . '/layouts/app.blade.php', '<html><body>{{ $slot }}</body></html>');
         $this->app['view']->prependNamespace('platform', $layoutDir);
     }
+
+    /** Management Book aus MB_MODULE_PATH mitladen (für den Regelkreis Einheit → LA). false, wenn nicht verfügbar. */
+    protected function bootManagementBook(): bool
+    {
+        $mb = getenv('MB_MODULE_PATH');
+        if (! $mb || ! is_dir($mb)) {
+            return false;
+        }
+        spl_autoload_register(function ($c) use ($mb) {
+            $p = 'Platform\\ManagementBook\\';
+            if (str_starts_with($c, $p)) {
+                $f = $mb . '/src/' . str_replace('\\', '/', substr($c, strlen($p))) . '.php';
+                if (is_file($f)) {
+                    require $f;
+                }
+            }
+        });
+        $files = glob($mb . '/database/migrations/*.php');
+        sort($files);
+        foreach ($files as $f) {
+            try {
+                (require $f)->up();
+            } catch (\Throwable $e) {
+            }
+        }
+        $this->app->register(\Platform\ManagementBook\ManagementBookServiceProvider::class);
+
+        return \Platform\Signals\Support\CommitteeGateways::has();
+    }
+
+    protected function relate(int $from, int $to, string $code, string $name): void
+    {
+        $typeId = DB::table('organization_entity_relation_types')->where('code', $code)->value('id')
+            ?? $this->row('organization_entity_relation_types', ['code' => $code, 'name' => $name, 'is_active' => true, 'sort_order' => 1]);
+        $this->row('organization_entity_relationships', ['from_entity_id' => $from, 'to_entity_id' => $to, 'relation_type_id' => $typeId, 'team_id' => $this->s['teamId'], 'user_id' => $this->s['user']->id]);
+    }
 }

@@ -23,7 +23,7 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
     {
         return 'GET /signals/signals - Ausgelöste Signale (algedonische Alarme) an Knoten. Default: nur bearbeitbare (open/acknowledged, nicht zurückgestellt), schwerste zuerst. '
             . 'Mit id: ein Signal im Detail inkl. Maßnahmen und Kommentaren. Filter: entity_id (+ include_children), status, severity, signal_set_id, signal_template_id, '
-            . 'responsible_user_id (Signale, für die ein Agent zuständig ist), assignee_entity_id, source, include_snoozed.';
+            . 'responsible_user_id (Signale, für die ein Agent zuständig ist), assignee_entity_id, unit_entity_id (verantwortliche Einheit), stage (unit | committee | escalated | strategy), committee_entity_id, source, include_snoozed.';
     }
 
     public function getSchema(): array
@@ -41,6 +41,9 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
                 'signal_template_id' => ['type' => 'integer'],
                 'responsible_user_id' => ['type' => 'integer'],
                 'assignee_entity_id' => ['type' => 'integer'],
+                'unit_entity_id' => ['type' => 'integer', 'description' => 'Signale einer verantwortlichen Einheit.'],
+                'stage' => ['type' => 'string', 'enum' => ['unit', 'committee', 'escalated', 'strategy']],
+                'committee_entity_id' => ['type' => 'integer', 'description' => 'Signale, die in diesem Gremium liegen.'],
                 'include_snoozed' => ['type' => 'boolean'],
                 'limit' => ['type' => 'integer', 'description' => 'Default 50, max 200.'],
                 'offset' => ['type' => 'integer'],
@@ -71,7 +74,7 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
             } else {
                 $q->whereIn('status', ['open', 'acknowledged']);
             }
-            foreach (['severity', 'source', 'signal_set_id', 'signal_template_id', 'responsible_user_id', 'assignee_entity_id'] as $f) {
+            foreach (['severity', 'source', 'signal_set_id', 'signal_template_id', 'responsible_user_id', 'assignee_entity_id', 'unit_entity_id', 'stage', 'committee_entity_id'] as $f) {
                 if (! empty($arguments[$f])) {
                     $q->where($f, $arguments[$f]);
                 }

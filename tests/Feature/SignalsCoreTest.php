@@ -164,13 +164,13 @@ class SignalsCoreTest extends TestCase
         $this->assertNotNull($r->data['signal']['snooze_until']);
         $this->assertSame(0, $this->tool(ListSignalsTool::class, ['entity_id' => $this->ids['a1']])->data['pagination']['total'], 'zurückgestellt = nicht bearbeitbar');
 
-        // Auflösen mit Notiz und Verweis auf ein anderes Signal (Morph-Alias „signal“ als Stellvertreter für Beschluss/Aufgabe)
+        // Auflösen mit Notiz und Verweis auf ein anderes Signal (Morph-Alias „signals_signal“ als Stellvertreter für Beschluss/Aufgabe)
         $other = Signal::where('entity_id', $this->ids['a'])->first();
-        $r = $this->tool(UpdateSignalTool::class, ['id' => $signal->id, 'action' => 'resolve', 'resolution_note' => 'Im LA entschieden: zweites Team', 'link_type' => 'signal', 'link_id' => $other->id]);
+        $r = $this->tool(UpdateSignalTool::class, ['id' => $signal->id, 'action' => 'resolve', 'resolution_note' => 'Im LA entschieden: zweites Team', 'link_type' => 'signals_signal', 'link_id' => $other->id]);
         $this->assertTrue($r->success, json_encode($r->error ?? null));
         $this->assertSame('resolved', $r->data['signal']['status']);
         $this->assertSame('Im LA entschieden: zweites Team', $r->data['signal']['resolution_note']);
-        $this->assertSame(['type' => 'signal', 'id' => $other->id], $r->data['signal']['resolution_link']);
+        $this->assertSame(['type' => 'signals_signal', 'id' => $other->id], $r->data['signal']['resolution_link']);
         $this->assertSame($this->s['user']->id, $r->data['signal']['resolved_by_user_id']);
         $this->assertSame($other->id, $signal->fresh()->resolutionLink->id);
 

@@ -343,6 +343,8 @@ class SignalsServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Signals\Tools\DeleteEnvironmentSourceTool());
             $registry->register(new \Platform\Signals\Tools\RateEnvironmentSourceTool());
             $registry->register(new \Platform\Signals\Tools\ListEnvironmentSnapshotsTool());
+            $registry->register(new \Platform\Signals\Tools\CreateCommitteeItemTool());
+            $registry->register(new \Platform\Signals\Tools\GetCommitteeSituationTool());
         } catch (\Throwable $e) {
             // ToolRegistry nicht verfügbar
         }

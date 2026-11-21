@@ -24,7 +24,7 @@ class UpdateSignalTool implements ToolContract, ToolMetadataContract
     public function getDescription(): string
     {
         return 'PUT /signals/signals/{id} - Bearbeitet ein Signal. Pflicht: id. '
-            . 'action: acknowledge (gesehen, stoppt Eskalation) | resolve | dismiss | reopen. Beim Erledigen Rückkopplung festhalten: resolution_note (wodurch erledigt) '
+            . 'action: acknowledge (gesehen, stoppt Eskalation) | resolve | dismiss | reopen | solve_locally (die Einheit hat es im Entscheidungsrahmen selbst gelöst; resolution_note Pflicht, frame_id optional). Beim Erledigen Rückkopplung festhalten: resolution_note (wodurch erledigt) '
             . 'und Verweis link_type + link_id (management_book_decision, management_book_agenda_item, management_book_meeting, management_book_risk, planner_task, helpdesk_ticket oder Morph-Alias); reason bei dismiss. '
             . 'Außerdem: assignee_entity_id (zuweisen, 0 = entfernen), snooze_until (ISO, zurückstellen) / unsnooze=true, '
             . 'action_id + action_status (Maßnahme applied|dismissed|pending entscheiden; Signal-Status folgt), focus=true|false (eigener Fokus), comment.';
@@ -36,7 +36,8 @@ class UpdateSignalTool implements ToolContract, ToolMetadataContract
             'type' => 'object',
             'properties' => [
                 'id' => ['type' => 'integer', 'description' => 'ERFORDERLICH'],
-                'action' => ['type' => 'string', 'enum' => ['acknowledge', 'resolve', 'dismiss', 'reopen']],
+                'action' => ['type' => 'string', 'enum' => ['acknowledge', 'resolve', 'dismiss', 'reopen', 'solve_locally']],
+                'frame_id' => ['type' => 'integer', 'description' => 'Mit solve_locally: Beschluss (Entscheidungsrahmen), auf den sich die lokale Lösung stützt.'],
                 'resolution_note' => ['type' => 'string'],
                 'link_type' => ['type' => 'string'],
                 'link_id' => ['type' => 'integer'],
@@ -95,7 +96,10 @@ class UpdateSignalTool implements ToolContract, ToolMetadataContract
                 }
                 $done[] = $arguments['focus'] ? 'im Fokus' : 'aus dem Fokus';
             }
-            if (! empty($arguments['action'])) {
+            if (($arguments['action'] ?? null) === 'solve_locally') {
+                $signal = app(\Platform\Signals\Services\CircleService::class)->solveLocally($signal, (string) ($arguments['resolution_note'] ?? ''), $context->user, ! empty($arguments['frame_id']) ? (int) $arguments['frame_id'] : null);
+                $done[] = 'lokal gelöst';
+            } elseif (! empty($arguments['action'])) {
                 $signal = $service->transition($signal, (string) $arguments['action'], $context->user, [
                     'reason' => $arguments['reason'] ?? null,
                     'resolution_note' => $arguments['resolution_note'] ?? null,
