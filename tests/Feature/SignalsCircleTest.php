@@ -167,4 +167,12 @@ class SignalsCircleTest extends TestCase
         $this->assertStringNotContainsString('Platform\\Signals', $src);
         $this->assertStringNotContainsString('signals_signal', $src);
     }
+    public function test_legacy_signals_without_unit_are_delivered_when_the_situation_is_read(): void
+    {
+        $signal = $this->signalAt('a1');
+        $signal->forceFill(['unit_entity_id' => null])->save();
+        $sit = $this->tool(GetCommitteeSituationTool::class, ['committee_entity_id' => $this->ids['la']], $this->s['agent']);
+        $this->assertSame([$signal->id], array_column($sit->data['candidates'], 'id'));
+        $this->assertSame('Martin', $sit->data['units'][$this->ids['a']]['leader']['name']);
+    }
 }

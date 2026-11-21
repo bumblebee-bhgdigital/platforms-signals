@@ -203,6 +203,11 @@ class CircleService
         $gateway = CommitteeGateways::get();
         $meeting = $gateway?->nextMeeting($committeeEntityId);
 
+        // Bestand von vor dem Regelkreis: offene Signale ohne Einheit nachträglich zustellen
+        Signal::query()->whereIn('team_id', (array) $teamIds)->whereNull('unit_entity_id')
+            ->whereIn('status', ['open', 'acknowledged'])->limit(500)->get()
+            ->each(fn (Signal $s) => $this->deliver($s));
+
         $inCommittee = Signal::query()->whereIn('team_id', (array) $teamIds)->where('committee_entity_id', $committeeEntityId)
             ->whereIn('status', ['open', 'acknowledged'])->get();
 
