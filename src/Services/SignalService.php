@@ -20,15 +20,6 @@ use Platform\Signals\Models\SignalFocus;
 class SignalService
 {
     /** Kurzschlüssel für Auflösungs-Verweise (zusätzlich zu Morph-Aliasen und Klassennamen). */
-    public const LINK_TYPES = [
-        'management_book_decision' => 'Platform\\ManagementBook\\Models\\ManagementBookDecision',
-        'management_book_agenda_item' => 'Platform\\ManagementBook\\Models\\ManagementBookAgendaItem',
-        'management_book_meeting' => 'Platform\\ManagementBook\\Models\\ManagementBookMeeting',
-        'management_book_risk' => 'Platform\\ManagementBook\\Models\\ManagementBookRisk',
-        'planner_task' => 'Platform\\Planner\\Models\\PlannerTask',
-        'helpdesk_ticket' => 'Platform\\Helpdesk\\Models\\HelpdeskTicket',
-    ];
-
     /**
      * Signal anlegen (Agent, Mensch, Umzug). Maßnahmen optional als [{title, description}].
      *
@@ -249,7 +240,7 @@ class SignalService
     }
 
     /**
-     * Verweis prüfen: Kurzschlüssel (LINK_TYPES), Morph-Alias oder Klassenname; das Objekt muss existieren.
+     * Verweis prüfen: Morph-Alias eines registrierten Objekt-Typs (jedes Modul meldet seine selbst an); das Objekt muss existieren.
      *
      * @return array{0:string, 1:int}
      */
@@ -258,17 +249,28 @@ class SignalService
         if ($id <= 0) {
             throw new SignalSetException('link_id fehlt.', 'VALIDATION_ERROR');
         }
-        $class = self::LINK_TYPES[$type] ?? Relation::getMorphedModel($type) ?? $type;
-        if (! class_exists($class) || ! is_subclass_of($class, Model::class)) {
-            throw new SignalSetException("Unbekannter link_type '{$type}'. Erlaubt: " . implode(', ', array_keys(self::LINK_TYPES)) . ' oder ein Morph-Alias.', 'VALIDATION_ERROR');
+        $class = Relation::getMorphedModel($type);
+        if (! $class || ! class_exists($class) || ! is_subclass_of($class, Model::class)) {
+            throw new SignalSetException("Unbekannter link_type '{$type}'. Erlaubt: " . implode(', ', array_column(self::linkTypes(), 'value')) . '.', 'VALIDATION_ERROR');
         }
         if (! $class::query()->whereKey($id)->exists()) {
             throw new SignalSetException("Verweis {$type} #{$id} existiert nicht.", 'NOT_FOUND');
         }
 
-        // gespeichert wird der Morph-Alias, wenn es einen gibt, sonst der Klassenname
-        $alias = array_search($class, Relation::morphMap(), true);
+        return [$type, $id];
+    }
 
-        return [$alias !== false ? $alias : $class, $id];
+    /** Verweis-Typen zur Auswahl: alle Objekt-Typen, die Module bei der Organisation anmelden. [['value','label']] */
+    public static function linkTypes(): array
+    {
+        try {
+            $config = app(\Platform\Organization\Services\EntityLinkRegistry::class)->allLinkTypeConfig();
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return collect($config)->filter(fn ($c, $alias) => $alias !== Signal::MORPH_ALIAS && Relation::getMorphedModel($alias))
+            ->map(fn ($c, $alias) => ['value' => $alias, 'label' => $c['singular'] ?? $c['label'] ?? $alias])
+            ->sortBy('label')->values()->all();
     }
 }

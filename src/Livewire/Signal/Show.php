@@ -122,14 +122,7 @@ class Show extends Component
             'link' => $link,
             'comments' => $s->comments()->with('user:id,name')->orderBy('created_at')->get(),
             'focused' => $s->isFocusedBy(auth()->user()),
-            'linkTypes' => [
-                ['value' => 'management_book_decision', 'label' => 'Beschluss (Management Book)'],
-                ['value' => 'management_book_agenda_item', 'label' => 'Agendapunkt (Management Book)'],
-                ['value' => 'management_book_meeting', 'label' => 'Sitzung (Management Book)'],
-                ['value' => 'management_book_risk', 'label' => 'Risiko (Management Book)'],
-                ['value' => 'planner_task', 'label' => 'Aufgabe (Planner)'],
-                ['value' => 'helpdesk_ticket', 'label' => 'Ticket (Helpdesk)'],
-            ],
+            'linkTypes' => \Platform\Signals\Services\SignalService::linkTypes(),
         ])->layout('platform::layouts.app');
     }
 }

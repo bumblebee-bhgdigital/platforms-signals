@@ -208,21 +208,7 @@ class SignalsServiceProvider extends ServiceProvider
         $this->registerEntityLinkProvider();
         $this->registerTools();
         $this->registerAlgedonicListener();
-        $this->registerCommitteeListeners();
         $this->registerSchedule();
-    }
-
-    /** Rückweg aus den Gremien: allgemeine Ereignisse des Management Books (lose: Signals hört, das Book kennt Signals nicht). */
-    protected function registerCommitteeListeners(): void
-    {
-        $events = [
-            'Platform\\ManagementBook\\Events\\AgendaItemDecided' => 'decided',
-            'Platform\\ManagementBook\\Events\\AgendaProposalRejected' => 'proposalRejected',
-        ];
-        // per Klassenname registriert: feuert nur, wenn das Book das Ereignis auslöst – ohne Book passiert nichts
-        foreach ($events as $event => $method) {
-            \Illuminate\Support\Facades\Event::listen($event, [\Platform\Signals\Listeners\HandleCommitteeEvents::class, $method]);
-        }
     }
 
     /** Algedonic-Kanal (Beer): Core dispatcht, Signals erzeugt das Signal. */

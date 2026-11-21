@@ -100,16 +100,25 @@ Die Vorbereitung läuft **fortwährend**, nicht an einem Tag: In jedem Takt arbe
 (lokal lösen oder als Entwurf in die nächste Sitzung heben); die Agenda wächst laufend. Kurz vor der Sitzung wird nur
 noch abgeschlossen (Lagebild, Vollständigkeit der vier Fragen, offene 4a-Bestätigungen). Nach der Sitzung: Beschlüsse nachhalten.
 
-### 6b. Rekursion, Ebenen und Stewards
-- **Jeder LA hat einen Träger** (Einheit über seinem Knoten); die **Ebene** folgt aus dem Trägertyp: Venture/Einheit = operativ,
-  Venture-Träger/Holding/Gruppe = Gruppe. Kandidaten eines LA sind nur Signale, für die er der **nächste** LA ist.
-- **Stellvertretung:** Hat ein Träger (z. B. ein Venture) keinen aktiven LA, arbeitet der LA darüber stellvertretend – sichtbar als
-  „stellvertretend für …“. Aktiviert das Venture sein Book, wandern seine Signale automatisch dorthin.
-- **Eskalation** im LA einer Ebene macht das Signal zum Kandidaten im LA darüber (`origin_committee_entity_id` bleibt sichtbar).
-- **Steward** eines Regelkreises: Mensch oder Agent, beliebig viele – Beziehung „betreut (Regelkreis)“ (Code `stewards`) vom
-  Personen- oder Agenten-Knoten zum Gremium-Knoten (Übergang: verantwortlicher Agent des Gremiums). Agenten arbeiten per MCP
-  (`signals.committee_items.GET` ohne Gremium = meine Kreise), Menschen auf der Seite „Regelkreis“ – dieselbe Logik.
-- Lose: Signals kennt nur den Vertrag `CommitteeGateway`; das Book feuert allgemeine Ereignisse und kennt Signals nicht.
+### 6b. Rekursion, Ebenen und Stewards – lose gekoppelt
+**Wer weiß was:**
+- *Organisation* – Struktur und ihre Semantik: VSM-Klasse `carrier` (lebensfähiges System), Agent-Knoten (Scope `agents()`),
+  Beziehungen. Signals kennt **keine Knotentyp-Codes**.
+- *Gremien-Modul* (heute das Book, Vertrag `CommitteeGateway`) – nur eigenes Wissen: aktive LAs mit ihrem Knoten, Sitzungen,
+  Entscheidungsrahmen, Entwürfe, Rückweg der Beschlüsse für *beliebige* verknüpfte Objekt-Typen. Kennt Signals und Knotentypen nicht.
+- *Signals* – der Regelkreis: Einheit, Ebene, Stellvertretung, Eskalation, Stewards.
+
+**Regeln (alle aus der Struktur):**
+- Einheit eines Signals = nächster Träger. Träger eines LA = nächster Träger über dem Gremium-Knoten.
+- Nächster LA eines Knotens = LA des nächsten Trägers, der einen hat. Kandidaten eines LA sind nur Signale, für die er der nächste ist.
+- **Ebene:** Ein LA, unter dem weitere LAs arbeiten, ist Gruppen-Ebene, sonst operativ – ohne Typ-Listen.
+- **Stellvertretung:** Hat ein Träger keinen aktiven LA, arbeitet der LA darüber „stellvertretend für …“. Bekommt er einen, wandern die Signale dorthin.
+- **Eskalation** im LA macht das Signal zum Kandidaten im LA darüber (`origin_committee_entity_id` bleibt sichtbar).
+- **Stewards:** Menschen und/oder Agenten, beliebig viele – Beziehung `signals.circle.steward_relation` (Standard `stewards`,
+  „Betreut (Regelkreis)“) zum Gremium-Knoten, plus die Verantwortlichen, die das Gremien-Modul nennt. Führung einer Einheit:
+  `signals.circle.leader_relation` (Standard `manages`). Agenten arbeiten per MCP, Menschen auf der Seite „Regelkreis“.
+- Verweise (resolution_link) sind Morph-Aliase, die Module selbst registrieren – Signals führt keine Liste fremder Klassen.
+- Tests: Signals gegen ein Test-Double des Vertrags und mit nichtssagenden Typ-Codes; das Book testet seine Umsetzung des Vertrags.
 
 ### 7. Lagebild
 Je Einheit (was lokal gelöst wurde, im Rahmen) und je LA-Sitzung (was ansteht, was sich zwischen Einheiten verdichtet,

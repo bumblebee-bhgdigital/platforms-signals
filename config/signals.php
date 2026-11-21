@@ -108,4 +108,13 @@ return [
             ],
         ],
     ],
+
+    /*
+    | Regelkreis: welche Beziehungen der Organisation Führung und Betreuung bedeuten. Einheiten sind Träger
+    | (VSM-Klasse carrier der Organisation) – Knotentypen kennt Signals nicht.
+    */
+    'circle' => [
+        'leader_relation' => env('SIGNALS_CIRCLE_LEADER_RELATION', 'manages'),
+        'steward_relation' => env('SIGNALS_CIRCLE_STEWARD_RELATION', 'stewards'),
+    ],
 ];

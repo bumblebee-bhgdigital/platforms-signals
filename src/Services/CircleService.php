@@ -4,6 +4,9 @@ namespace Platform\Signals\Services;
 
 use Platform\Core\Models\User;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityRelationship;
+use Platform\Organization\Models\OrganizationEntityType;
+use Platform\Signals\Support\Agents;
 use Platform\Signals\Exceptions\SignalSetException;
 use Platform\Signals\Models\Signal;
 use Platform\Signals\Support\CommitteeGateways;
@@ -17,52 +20,165 @@ use Platform\Signals\Support\CommitteeGateways;
  */
 class CircleService
 {
-    /** Knotentypen, die keine verantwortliche Einheit sind (Ordner, Gremien, Personen, Agenten). */
-    public const NOT_A_UNIT = ['container', 'board', 'person', 'agent', 'system_agent'];
-
     public const OUTCOMES = ['solved_locally', 'measure', 'returned_to_unit', 'escalated', 'strategy_topic', 'dismissed'];
 
+    /** @var array<int, array>|null Träger-Knoten => Gremium (pro Request) */
+    private ?array $byCarrier = null;
+
     /**
-     * Verantwortliche Einheit eines Knotens – aus der Struktur (VSM): der Knoten selbst oder der nächste Vorfahr, der ein
-     * Träger ist (Typ mit vsm_class carrier, z. B. Venture, Business Unit). Ohne Träger im Pfad: nächste Einheit mit
-     * Verantwortlichem („Führt an“), sonst die nächste Einheit, sonst der Knoten. Der Verantwortliche hängt an der Einheit
-     * (leaderOf) und ist optional.
+     * Verantwortliche Einheit eines Knotens: der Knoten selbst oder sein nächster Vorfahr, der ein Träger ist
+     * (VSM-Klasse carrier der Organisation – lebensfähiges System). Ohne Träger im Pfad: der Knoten selbst.
      */
     public function unitFor(int $entityId): int
     {
-        $firstLed = null;
-        $firstUnit = null;
-        $current = OrganizationEntity::with('type:id,code,vsm_class')->find($entityId);
-        for ($depth = 0; $current && $depth < 30; $depth++) {
-            if (! in_array($current->type?->code, self::NOT_A_UNIT, true)) {
-                if ($current->type?->vsm_class === 'carrier') {
-                    return (int) $current->id;
-                }
-                $firstUnit ??= (int) $current->id;
-                if ($firstLed === null && $this->leaderOf($current->id)) {
-                    $firstLed = (int) $current->id;
-                }
-            }
-            $current = $current->parent_entity_id ? OrganizationEntity::with('type:id,code,vsm_class')->find($current->parent_entity_id) : null;
-        }
-
-        return $firstLed ?? $firstUnit ?? $entityId;
+        return $this->carrierOf($entityId) ?? $entityId;
     }
 
-    /** Verantwortliche Person einer Einheit (Beziehung „Führt an“): ['entity_id','name','user_id'] oder null. */
+    public function carrierOf(?int $entityId): ?int
+    {
+        $current = $entityId ? OrganizationEntity::with('type:id,vsm_class')->find($entityId) : null;
+        for ($depth = 0; $current && $depth < 30; $depth++) {
+            if ($current->type?->vsm_class === OrganizationEntityType::VSM_CLASS_CARRIER) {
+                return (int) $current->id;
+            }
+            $current = $current->parent_entity_id ? OrganizationEntity::with('type:id,vsm_class')->find($current->parent_entity_id) : null;
+        }
+
+        return null;
+    }
+
+    /** Verantwortliche Person einer Einheit (Beziehung aus signals.circle.leader_relation): ['entity_id','name','user_id'] oder null. */
     public function leaderOf(int $unitEntityId): ?array
     {
-        if (! class_exists(\Platform\Organization\Models\OrganizationEntityRelationship::class)) {
-            return null;
-        }
-        $rel = \Platform\Organization\Models\OrganizationEntityRelationship::query()
-            ->where('to_entity_id', $unitEntityId)
-            ->whereHas('relationType', fn ($q) => $q->where('code', 'manages'))
-            ->with('fromEntity:id,name,linked_user_id')
-            ->orderBy('id')->first();
-        $person = $rel?->fromEntity;
+        $person = $this->related(config('signals.circle.leader_relation', 'manages'), $unitEntityId)->first();
 
         return $person ? ['entity_id' => (int) $person->id, 'name' => $person->name, 'user_id' => $person->linked_user_id ? (int) $person->linked_user_id : null] : null;
+    }
+
+    /** Knoten, die per Beziehung $code auf $toEntityId zeigen. */
+    private function related(string $code, int $toEntityId): \Illuminate\Support\Collection
+    {
+        return OrganizationEntityRelationship::query()->where('to_entity_id', $toEntityId)
+            ->whereHas('relationType', fn ($q) => $q->where('code', $code))
+            ->with('fromEntity:id,name,linked_user_id')->orderBy('id')->get()->pluck('fromEntity')->filter()->values();
+    }
+
+    // ---- Rekursion: Gremien über Trägern ----
+
+    /** Gremien nach ihrem Träger (nächster Träger über dem Gremium-Knoten). */
+    private function committeesByCarrier(): array
+    {
+        if ($this->byCarrier !== null) {
+            return $this->byCarrier;
+        }
+        $this->byCarrier = [];
+        foreach (CommitteeGateways::get()?->committees() ?? [] as $c) {
+            $parent = OrganizationEntity::whereKey($c['entity_id'])->value('parent_entity_id');
+            if ($carrier = $this->carrierOf($parent ? (int) $parent : null)) {
+                $this->byCarrier[$carrier] ??= $c + ['carrier_entity_id' => $carrier];
+            }
+        }
+
+        return $this->byCarrier;
+    }
+
+    /**
+     * Nächster LA über einem Knoten: der LA des nächsten Trägers, der einen hat. proxy_for_entity_id = oberster Träger
+     * unterhalb, der keinen eigenen LA hat (der LA arbeitet stellvertretend für ihn).
+     */
+    public function committeeAbove(int $entityId): ?array
+    {
+        $byCarrier = $this->committeesByCarrier();
+        $proxy = null;
+        $carrier = $this->carrierOf($entityId);
+        for ($depth = 0; $carrier && $depth < 30; $depth++) {
+            if (isset($byCarrier[$carrier])) {
+                return $this->describe($byCarrier[$carrier]) + ['proxy_for_entity_id' => $proxy];
+            }
+            $proxy = $carrier;
+            $parent = OrganizationEntity::whereKey($carrier)->value('parent_entity_id');
+            $carrier = $this->carrierOf($parent ? (int) $parent : null);
+        }
+
+        return null;
+    }
+
+    public function committeeInfo(int $committeeEntityId): ?array
+    {
+        $c = collect($this->committeesByCarrier())->firstWhere('entity_id', $committeeEntityId);
+
+        return $c ? $this->describe($c) : null;
+    }
+
+    /** Nächster LA über einem Gremium (Eskalation eine Ebene höher). */
+    public function committeeAboveCommittee(int $committeeEntityId): ?array
+    {
+        $c = $this->committeeInfo($committeeEntityId);
+        $parent = $c ? OrganizationEntity::whereKey($c['carrier_entity_id'])->value('parent_entity_id') : null;
+
+        return $parent ? $this->committeeAbove((int) $parent) : null;
+    }
+
+    /** Ebene aus der Struktur: ein LA, unter dem weitere LAs arbeiten, ist Gruppen-Ebene; sonst operativ. */
+    private function describe(array $c): array
+    {
+        $children = collect($this->committeesByCarrier())->filter(function ($other) use ($c) {
+            if ($other['entity_id'] === $c['entity_id']) {
+                return false;
+            }
+            $parent = OrganizationEntity::whereKey($other['carrier_entity_id'])->value('parent_entity_id');
+            $up = $parent ? $this->carrierOf((int) $parent) : null;
+            for ($d = 0; $up && $d < 30; $d++) {
+                if (isset($this->byCarrier[$up])) {
+                    return $up === $c['carrier_entity_id'];
+                }
+                $p = OrganizationEntity::whereKey($up)->value('parent_entity_id');
+                $up = $p ? $this->carrierOf((int) $p) : null;
+            }
+
+            return false;
+        });
+
+        return [
+            'committee_id' => (int) $c['committee_id'],
+            'entity_id' => (int) $c['entity_id'],
+            'name' => $c['name'],
+            'carrier_entity_id' => (int) $c['carrier_entity_id'],
+            'carrier_name' => OrganizationEntity::whereKey($c['carrier_entity_id'])->value('name'),
+            'level' => $children->isNotEmpty() ? 'group' : 'unit',
+            'sub_committees' => $children->pluck('entity_id')->map(fn ($id) => (int) $id)->values()->all(),
+        ];
+    }
+
+    // ---- Stewards: Menschen und/oder Agenten ----
+
+    /**
+     * Wer betreut den Regelkreis eines Gremiums: Beziehung aus signals.circle.steward_relation zum Gremium-Knoten
+     * plus die vom Gremien-Modul genannten Verantwortlichen.
+     */
+    public function stewards(int $committeeEntityId): array
+    {
+        $out = [];
+        foreach ($this->related(config('signals.circle.steward_relation', 'stewards'), $committeeEntityId) as $e) {
+            $out['e' . $e->id] = ['entity_id' => (int) $e->id, 'name' => $e->name, 'user_id' => $e->linked_user_id ? (int) $e->linked_user_id : null];
+        }
+        $c = collect(CommitteeGateways::get()?->committees() ?? [])->firstWhere('entity_id', $committeeEntityId);
+        foreach ($c['responsible_user_ids'] ?? [] as $uid) {
+            if (! collect($out)->contains('user_id', (int) $uid)) {
+                $e = OrganizationEntity::query()->where('linked_user_id', $uid)->first(['id', 'name']);
+                $out['u' . $uid] = ['entity_id' => $e ? (int) $e->id : null, 'name' => $e?->name ?? User::whereKey($uid)->value('name'), 'user_id' => (int) $uid];
+            }
+        }
+
+        return array_values(array_map(fn ($s) => $s + ['is_agent' => $s['user_id'] ? Agents::isAgent(User::find($s['user_id'])) : false], $out));
+    }
+
+    /** Gremien, deren Regelkreis ein Nutzer betreut (Mensch oder Agent). */
+    public function committeesFor(int $userId): array
+    {
+        return collect($this->committeesByCarrier())
+            ->filter(fn ($c) => collect($this->stewards((int) $c['entity_id']))->contains('user_id', $userId))
+            ->map(fn ($c) => $this->describe($c))->values()->all();
     }
 
     /** Signal der Einheit zustellen (beim Anlegen): Einheit setzen, Stufe „unit“. */
@@ -83,7 +199,11 @@ class CircleService
         }
         $opts = ['resolution_note' => $note];
         if ($frameDecisionId) {
-            $opts['link_type'] = 'management_book_decision';
+            $frame = collect(CommitteeGateways::get()?->frames((int) ($signal->unit_entity_id ?: $signal->entity_id)) ?? [])->firstWhere('decision_id', $frameDecisionId);
+            if (! $frame) {
+                throw new SignalSetException("Entscheidungsrahmen #{$frameDecisionId} gilt nicht für diese Einheit.", 'NOT_FOUND');
+            }
+            $opts['link_type'] = $frame['type'];
             $opts['link_id'] = $frameDecisionId;
         }
         $signal = app(SignalService::class)->transition($signal, 'resolve', $by, $opts);
@@ -127,7 +247,7 @@ class CircleService
         // Eskaliertes Signal: in den LA, an den es eskaliert wurde (eine Ebene höher), sonst der LA über der Einheit
         $committee = $escalated
             ? ['entity_id' => (int) $signal->committee_entity_id, 'name' => OrganizationEntity::whereKey($signal->committee_entity_id)->value('name') ?? 'Lenkungsausschuss']
-            : $gateway->committeeAbove($unitId);
+            : $this->committeeAbove($unitId);
         if (! $committee) {
             throw new SignalSetException('Über dieser Einheit gibt es keinen aktiven Lenkungsausschuss.', 'NOT_FOUND');
         }
@@ -145,7 +265,7 @@ class CircleService
             'system_support' => trim((string) $q['system_support']),
             'local_solution_confirmed' => (bool) ($q['local_solution_confirmed'] ?? false),
             'unit_entity_id' => $unitId,
-            'agent_user_id' => $by && \Platform\Signals\Support\Agents::isAgent($by) ? $by->id : null,
+            'agent_user_id' => $by && Agents::isAgent($by) ? $by->id : null,
         ], Signal::MORPH_ALIAS, (int) $signal->id);
 
         $signal->forceFill([
@@ -187,7 +307,7 @@ class CircleService
             case 'escalation':
                 // eine Ebene höher: Kandidat im nächsten LA über diesem Gremium (Herkunft bleibt sichtbar)
                 $from = $signal->committee_entity_id;
-                $upper = $from ? CommitteeGateways::get()?->committeeAboveCommittee((int) $from) : null;
+                $upper = $from ? $this->committeeAboveCommittee((int) $from) : null;
                 $signal->forceFill([
                     'stage' => 'escalated', 'outcome' => 'escalated',
                     'origin_committee_entity_id' => $from,
@@ -242,9 +362,9 @@ class CircleService
 
         $above = [];
         $candidates = $open()->where('stage', 'unit')->whereNotNull('unit_entity_id')->get()
-            ->filter(function (Signal $s) use ($gateway, $committeeEntityId, &$above) {
+            ->filter(function (Signal $s) use ($committeeEntityId, &$above) {
                 $u = (int) $s->unit_entity_id;
-                $above[$u] ??= $gateway?->committeeAbove($u);
+                $above[$u] ??= $this->committeeAbove($u);
 
                 return (int) ($above[$u]['entity_id'] ?? 0) === $committeeEntityId;
             })->values();
@@ -259,19 +379,13 @@ class CircleService
         ]])->all();
 
         return [
-            'committee' => $gateway?->committeeInfo($committeeEntityId) ?? ['entity_id' => $committeeEntityId, 'name' => OrganizationEntity::whereKey($committeeEntityId)->value('name')],
-            'stewards' => $gateway ? $gateway->stewards($committeeEntityId) : [],
+            'committee' => $this->committeeInfo($committeeEntityId) ?? ['entity_id' => $committeeEntityId, 'name' => OrganizationEntity::whereKey($committeeEntityId)->value('name')],
+            'stewards' => $this->stewards($committeeEntityId),
             'next_meeting' => $meeting,
             'in_committee' => $inCommittee,
             'escalated_here' => $escalated,
             'candidates' => $candidates,
             'units' => $unitInfo,
         ];
-    }
-
-    /** Gremien, deren Regelkreis ein Nutzer betreut (Mensch oder Agent). */
-    public function committeesFor(int $userId): array
-    {
-        return CommitteeGateways::get()?->committeesStewardedBy($userId) ?? [];
     }
 }

@@ -25,7 +25,7 @@ class UpdateSignalTool implements ToolContract, ToolMetadataContract
     {
         return 'PUT /signals/signals/{id} - Bearbeitet ein Signal. Pflicht: id. '
             . 'action: acknowledge (gesehen, stoppt Eskalation) | resolve | dismiss | reopen | solve_locally (die Einheit hat es im Entscheidungsrahmen selbst gelöst; resolution_note Pflicht, frame_id optional). Beim Erledigen Rückkopplung festhalten: resolution_note (wodurch erledigt) '
-            . 'und Verweis link_type + link_id (management_book_decision, management_book_agenda_item, management_book_meeting, management_book_risk, planner_task, helpdesk_ticket oder Morph-Alias); reason bei dismiss. '
+            . 'und Verweis link_type + link_id (Morph-Alias eines registrierten Objekt-Typs, z. B. eines Beschlusses oder einer Aufgabe; bei falschem Typ nennt der Fehler die erlaubten); reason bei dismiss. '
             . 'Außerdem: assignee_entity_id (zuweisen, 0 = entfernen), snooze_until (ISO, zurückstellen) / unsnooze=true, '
             . 'action_id + action_status (Maßnahme applied|dismissed|pending entscheiden; Signal-Status folgt), focus=true|false (eigener Fokus), comment.';
     }

@@ -141,35 +141,6 @@ trait SignalsHarness
         $this->app['view']->prependNamespace('platform', $layoutDir);
     }
 
-    /** Management Book aus MB_MODULE_PATH mitladen (für den Regelkreis Einheit → LA). false, wenn nicht verfügbar. */
-    protected function bootManagementBook(): bool
-    {
-        $mb = getenv('MB_MODULE_PATH');
-        if (! $mb || ! is_dir($mb)) {
-            return false;
-        }
-        spl_autoload_register(function ($c) use ($mb) {
-            $p = 'Platform\\ManagementBook\\';
-            if (str_starts_with($c, $p)) {
-                $f = $mb . '/src/' . str_replace('\\', '/', substr($c, strlen($p))) . '.php';
-                if (is_file($f)) {
-                    require $f;
-                }
-            }
-        });
-        $files = glob($mb . '/database/migrations/*.php');
-        sort($files);
-        foreach ($files as $f) {
-            try {
-                (require $f)->up();
-            } catch (\Throwable $e) {
-            }
-        }
-        $this->app->register(\Platform\ManagementBook\ManagementBookServiceProvider::class);
-
-        return \Platform\Signals\Support\CommitteeGateways::has();
-    }
-
     protected function relate(int $from, int $to, string $code, string $name): void
     {
         $typeId = DB::table('organization_entity_relation_types')->where('code', $code)->value('id')
@@ -177,3 +148,64 @@ trait SignalsHarness
         $this->row('organization_entity_relationships', ['from_entity_id' => $from, 'to_entity_id' => $to, 'relation_type_id' => $typeId, 'team_id' => $this->s['teamId'], 'user_id' => $this->s['user']->id]);
     }
 }
+
+/**
+ * Test-Double der Gremien-Brücke: Signals wird nur gegen den Vertrag getestet, nie gegen ein konkretes Gremien-Modul.
+ * Beschlüsse werden mit decide() simuliert; als Beschluss-Objekt dient ein beliebiges registriertes Modell (hier User).
+ */
+require_once getenv('SIGNALS_MODULE_PATH') . '/src/Contracts/CommitteeGateway.php';
+
+class FakeCommitteeGateway implements \Platform\Signals\Contracts\CommitteeGateway
+{
+    public const REF = 'test_ref';
+
+    public array $committees = [];
+    public array $meetings = [];
+    public array $items = [];
+    public array $frames = [];
+    private $handler;
+
+    public function addCommittee(int $entityId, string $name, array $responsible = [], bool $withMeeting = true): void
+    {
+        $id = count($this->committees) + 1;
+        $this->committees[] = ['committee_id' => $id, 'entity_id' => $entityId, 'name' => $name, 'responsible_user_ids' => $responsible];
+        if ($withMeeting) {
+            $this->meetings[$entityId] = ['meeting_id' => 100 + $id, 'title' => "{$name} Dezember", 'scheduled_at' => now()->addWeek()->toIso8601String(), 'url' => null];
+        }
+    }
+
+    public function committees(): array
+    {
+        return $this->committees;
+    }
+
+    public function nextMeeting(int $committeeEntityId): ?array
+    {
+        return $this->meetings[$committeeEntityId] ?? null;
+    }
+
+    public function frames(int $entityId): array
+    {
+        return $this->frames[$entityId] ?? [];
+    }
+
+    public function draftAgendaItem(int $meetingId, array $item, string $linkType, int $linkId): array
+    {
+        $id = count($this->items) + 1;
+        $this->items[$id] = $item + ['meeting_id' => $meetingId, 'link_type' => $linkType, 'link_id' => $linkId];
+
+        return ['type' => self::REF, 'id' => $id, 'meeting_id' => $meetingId, 'url' => null];
+    }
+
+    public function onOutcome(callable $handler): void
+    {
+        $this->handler = $handler;
+    }
+
+    public function decide(int $itemId, string $kind, string $text, int $refId): void
+    {
+        $i = $this->items[$itemId];
+        ($this->handler)($i['link_type'], $i['link_id'], $kind, self::REF, $refId, $text, null);
+    }
+}
+

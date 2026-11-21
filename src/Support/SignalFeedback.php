@@ -6,7 +6,7 @@ use Platform\Signals\Services\CircleService;
 
 /**
  * Einstiegsstelle für Rückmeldungen aus Gremien: ein Beschluss (oder ein herausgenommener Vorschlag) zu einem
- * Agendapunkt, der auf ein Signal verweist. Aufgerufen von HandleCommitteeEvents (Ereignisse des Books).
+ * Agendapunkt, der auf ein Signal verweist. Aufgerufen über den Rückweg der Gremien-Brücke (CommitteeGateways).
  */
 class SignalFeedback
 {
