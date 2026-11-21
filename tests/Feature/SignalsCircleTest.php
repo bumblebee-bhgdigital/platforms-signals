@@ -121,7 +121,7 @@ class SignalsCircleTest extends TestCase
 
         // Lage für den Steward
         $sit = $this->tool(GetCommitteeSituationTool::class, ['committee_entity_id' => $this->ids['la']], $this->s['agent']);
-        $this->assertSame([$signal->id], array_column($sit->data['in_committee'], 'id'));
+        $this->assertSame([$signal->id], array_column($sit->data['circles'][0]['in_committee'], 'id'));
 
         // Beschluss „zurück an den Bereich“
         $this->meeting->decisions()->create(['team_id' => $this->s['teamId'], 'agenda_item_id' => $item->id, 'text' => 'A und B klären das bilateral', 'kind' => 'return_to_unit', 'created_by' => $this->s['user']->id]);
@@ -172,7 +172,103 @@ class SignalsCircleTest extends TestCase
         $signal = $this->signalAt('a1');
         $signal->forceFill(['unit_entity_id' => null])->save();
         $sit = $this->tool(GetCommitteeSituationTool::class, ['committee_entity_id' => $this->ids['la']], $this->s['agent']);
-        $this->assertSame([$signal->id], array_column($sit->data['candidates'], 'id'));
-        $this->assertSame('Martin', $sit->data['units'][$this->ids['a']]['leader']['name']);
+        $this->assertSame([$signal->id], array_column($sit->data['circles'][0]['candidates'], 'id'));
+        $this->assertSame('Martin', $sit->data['circles'][0]['units'][$this->ids['a']]['leader']['name']);
+    }
+    /** Gruppe (venture_builder) → Venture V (eigener LA) → Projekt; LA der Gruppe am Gruppen-Knoten. */
+    private function twoLevels(bool $ventureLa = true): array
+    {
+        $t = $this->s['teamId'];
+        $type = function ($code, $class) use ($t) {
+            $id = DB::table('organization_entity_types')->where('code', $code)->value('id')
+                ?? $this->row('organization_entity_types', ['code' => $code, 'name' => $code, 'team_id' => $t, 'is_active' => true, 'sort_order' => 5, 'entity_type_group_id' => DB::table('organization_entity_type_groups')->value('id')]);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('organization_entity_types', 'vsm_class')) {
+                DB::table('organization_entity_types')->where('id', $id)->update(['vsm_class' => $class]);
+            }
+
+            return $id;
+        };
+        $mk = fn ($name, $parent, $code, $class = 'observed') => $this->row('organization_entities', ['name' => $name, 'team_id' => $t, 'user_id' => $this->s['user']->id, 'entity_type_id' => $type($code, $class), 'parent_entity_id' => $parent, 'is_active' => true]);
+        DB::table('organization_entities')->where('id', $this->ids['group'])->update(['entity_type_id' => $type('venture_builder', 'carrier')]);
+        $v = $mk('FOOD.WORKS', $this->ids['group'], 'venture', 'carrier');
+        $p = $mk('Lead-Projekt', $v, 'initiative');
+        $vGov = $mk('Governance V', $v, 'container');
+        $vLa = $mk('FOOD.WORKS Lenkungsausschuss', $vGov, 'board');
+        $book = \Platform\ManagementBook\Models\ManagementBook::first();
+        $vMeeting = null;
+        if ($ventureLa) {
+            $vc = \Platform\ManagementBook\Models\ManagementBookCommittee::create(['team_id' => $t, 'management_book_id' => $book->id, 'name' => 'LA V', 'type' => 'steering_committee', 'organization_entity_id' => $vLa, 'created_by' => $this->s['user']->id]);
+            $vMeeting = \Platform\ManagementBook\Models\ManagementBookMeeting::create(['team_id' => $t, 'committee_id' => $vc->id, 'title' => 'LA V Dezember', 'scheduled_at' => now()->addDays(3), 'status' => 'planned']);
+        }
+
+        return compact('v', 'p', 'vLa', 'vMeeting');
+    }
+
+    public function test_recursion_proxy_escalation_and_stewards(): void
+    {
+        $gw = \Platform\Signals\Support\CommitteeGateways::get();
+
+        // ohne eigenen Venture-LA: der LA der Gruppe arbeitet stellvertretend
+        $x = $this->twoLevels(false);
+        $above = $gw->committeeAbove($x['p']);
+        $this->assertSame($this->ids['la'], $above['entity_id']);
+        $this->assertSame($x['v'], $above['proxy_for_entity_id']);
+        $this->assertSame('group', $above['level']);
+    }
+
+    public function test_venture_la_takes_its_own_signals_and_escalates_one_level_up(): void
+    {
+        $gw = \Platform\Signals\Support\CommitteeGateways::get();
+        $x = $this->twoLevels(true);
+        $this->ids['p'] = $x['p'];
+
+        $above = $gw->committeeAbove($x['p']);
+        $this->assertSame($x['vLa'], $above['entity_id'], 'Venture-Interna gehören in den Venture-LA');
+        $this->assertSame('unit', $above['level']);
+        $this->assertNull($above['proxy_for_entity_id']);
+        $this->assertSame($this->ids['la'], $gw->committeeAboveCommittee($x['vLa'])['entity_id']);
+
+        $signal = $this->signalAt('p');
+        $this->assertSame($x['v'], $signal->unit_entity_id);
+        $sitGroup = app(CircleService::class)->committeeSituation($this->ids['la'], $this->s['teamId']);
+        $this->assertNotContains($signal->id, $sitGroup['candidates']->pluck('id')->all(), 'Gruppen-LA sieht keine Venture-Interna');
+
+        $r = $this->tool(CreateCommitteeItemTool::class, $this->fourQuestions($signal->id), $this->s['agent']);
+        $this->assertSame((int) $x['vMeeting']->id, $r->data['meeting']['meeting_id']);
+        $item = ManagementBookAgendaItem::find($r->data['agenda_item']['id']);
+        $x['vMeeting']->decisions()->create(['team_id' => $this->s['teamId'], 'agenda_item_id' => $item->id, 'text' => 'Braucht Entscheidung der Gruppe', 'kind' => 'escalation', 'created_by' => $this->s['user']->id]);
+
+        $signal->refresh();
+        $this->assertSame('escalated', $signal->stage);
+        $this->assertSame($this->ids['la'], $signal->committee_entity_id);
+        $this->assertSame($x['vLa'], $signal->origin_committee_entity_id);
+        $sitGroup = app(CircleService::class)->committeeSituation($this->ids['la'], $this->s['teamId']);
+        $this->assertSame([$signal->id], $sitGroup['escalated_here']->pluck('id')->all());
+
+        // eine Ebene höher heben → Entwurf in der Sitzung des Gruppen-LA
+        $r2 = $this->tool(CreateCommitteeItemTool::class, $this->fourQuestions($signal->id), $this->s['agent']);
+        $this->assertTrue($r2->success, json_encode($r2->error ?? null));
+        $this->assertSame((int) $this->meeting->id, $r2->data['meeting']['meeting_id']);
+    }
+
+    public function test_stewards_can_be_humans_or_agents(): void
+    {
+        $x = $this->twoLevels(true);
+        $this->relate($this->ids['martin'], $this->ids['la'], 'stewards', 'betreut (Regelkreis)');
+        $this->relate($this->ids['ratchet'], $x['vLa'], 'stewards', 'betreut (Regelkreis)');
+        $gw = \Platform\Signals\Support\CommitteeGateways::get();
+
+        $this->assertSame([$this->ids['la']], array_column($gw->committeesStewardedBy($this->s['user']->id), 'entity_id'));
+        $this->assertSame([$x['vLa']], array_column($gw->committeesStewardedBy($this->s['agent']->id), 'entity_id'));
+        $this->assertTrue($gw->stewards($x['vLa'])[0]['is_agent']);
+        $this->assertFalse($gw->stewards($this->ids['la'])[0]['is_agent']);
+
+        // Agent: ohne committee_entity_id → seine Kreise
+        $r = $this->tool(GetCommitteeSituationTool::class, [], $this->s['agent']);
+        $this->assertSame([$x['vLa']], array_map(fn ($c) => $c['committee']['entity_id'], $r->data['circles']));
+
+        // Mensch: Seite „Regelkreis“
+        $this->bootUi();
+        $this->get(route('signals.circle.index'))->assertOk()->assertSee('Gruppe Lenkungsausschuss')->assertSee('Gruppe');
     }
 }

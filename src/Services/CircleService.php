@@ -24,24 +24,29 @@ class CircleService
 
     /**
      * Verantwortliche Einheit eines Knotens: der Knoten selbst oder der nächste Vorfahr, der eine Einheit ist
-     * und einen Verantwortlichen hat („Führt an“). Fallback: nächste Einheit ohne Verantwortlichen, sonst der Knoten.
+     * und einen Verantwortlichen hat („Führt an“). Fallback: nächster Träger (vsm_class carrier), sonst nächste Einheit, sonst der Knoten.
      */
     public function unitFor(int $entityId): int
     {
-        $fallback = null;
-        $current = OrganizationEntity::with('type:id,code')->find($entityId);
+        $firstCarrier = null;
+        $firstUnit = null;
+        $current = OrganizationEntity::with('type:id,code,vsm_class')->find($entityId);
         for ($depth = 0; $current && $depth < 30; $depth++) {
             $isUnit = ! in_array($current->type?->code, self::NOT_A_UNIT, true);
             if ($isUnit) {
                 if ($this->leaderOf($current->id)) {
                     return (int) $current->id;
                 }
-                $fallback ??= (int) $current->id;
+                $firstUnit ??= (int) $current->id;
+                if ($current->type?->vsm_class === 'carrier') {
+                    $firstCarrier ??= (int) $current->id;
+                }
             }
-            $current = $current->parent_entity_id ? OrganizationEntity::with('type:id,code')->find($current->parent_entity_id) : null;
+            $current = $current->parent_entity_id ? OrganizationEntity::with('type:id,code,vsm_class')->find($current->parent_entity_id) : null;
         }
 
-        return $fallback ?? $entityId;
+        // ohne Verantwortlichen: der nächste Träger (z. B. das Venture), sonst die nächste Einheit
+        return $firstCarrier ?? $firstUnit ?? $entityId;
     }
 
     /** Verantwortliche Person einer Einheit (Beziehung „Führt an“): ['entity_id','name','user_id'] oder null. */
@@ -100,6 +105,7 @@ class CircleService
         if ($signal->stage === 'committee' && $signal->agenda_ref_id) {
             throw new SignalSetException("Das Signal liegt schon als LA-Punkt vor (#{$signal->agenda_ref_id}).");
         }
+        $escalated = $signal->stage === 'escalated' && $signal->committee_entity_id;
         foreach (['goal' => '1 (Ziel)', 'observation' => '2 (Beobachtung)', 'obstacle' => '3 (Hindernis)'] as $k => $label) {
             if (trim((string) ($q[$k] ?? '')) === '') {
                 throw new SignalSetException("Frage {$label} fehlt.");
@@ -118,7 +124,10 @@ class CircleService
         }
         $this->deliver($signal);
         $unitId = (int) ($signal->unit_entity_id ?: $signal->entity_id);
-        $committee = $gateway->committeeAbove($unitId);
+        // Eskaliertes Signal: in den LA, an den es eskaliert wurde (eine Ebene höher), sonst der LA über der Einheit
+        $committee = $escalated
+            ? ['entity_id' => (int) $signal->committee_entity_id, 'name' => OrganizationEntity::whereKey($signal->committee_entity_id)->value('name') ?? 'Lenkungsausschuss']
+            : $gateway->committeeAbove($unitId);
         if (! $committee) {
             throw new SignalSetException('Über dieser Einheit gibt es keinen aktiven Lenkungsausschuss.', 'NOT_FOUND');
         }
@@ -176,8 +185,19 @@ class CircleService
                 app(SignalService::class)->comment($signal, "Zurück an den Bereich – {$note}", $by, null, 'system');
                 break;
             case 'escalation':
-                $signal->forceFill(['stage' => 'escalated', 'outcome' => 'escalated', 'resolution_link_type' => $decisionType, 'resolution_link_id' => $decisionId])->save();
-                app(SignalService::class)->comment($signal, "Eskaliert – {$note}", $by, null, 'system');
+                // eine Ebene höher: Kandidat im nächsten LA über diesem Gremium (Herkunft bleibt sichtbar)
+                $from = $signal->committee_entity_id;
+                $upper = $from ? CommitteeGateways::get()?->committeeAboveCommittee((int) $from) : null;
+                $signal->forceFill([
+                    'stage' => 'escalated', 'outcome' => 'escalated',
+                    'origin_committee_entity_id' => $from,
+                    'committee_entity_id' => $upper['entity_id'] ?? null,
+                    'meeting_ref_id' => null, 'due_at' => null, 'agenda_ref_type' => null, 'agenda_ref_id' => null,
+                    'resolution_link_type' => $decisionType, 'resolution_link_id' => $decisionId,
+                ])->save();
+                app(SignalService::class)->comment($signal, $upper
+                    ? "Eskaliert an {$upper['name']} – {$note}"
+                    : "Eskaliert, aber über diesem Gremium gibt es keinen weiteren Lenkungsausschuss – {$note}", $by, null, 'system');
                 break;
             case 'strategy_topic':
                 $signal->forceFill(['stage' => 'strategy', 'outcome' => 'strategy_topic', 'resolution_link_type' => $decisionType, 'resolution_link_id' => $decisionId])->save();
@@ -197,7 +217,10 @@ class CircleService
         return $signal->fresh();
     }
 
-    /** Lage eines Lenkungsausschusses für den Steward: nächste Sitzung, Signale im LA, Kandidaten aus den Einheiten. */
+    /**
+     * Lage eines Lenkungsausschusses für seine Stewards (Menschen oder Agenten): Ebene, Stewards, nächste Sitzung,
+     * Signale im LA, an ihn eskalierte Signale und Kandidaten – nur Signale, für die er der nächste LA ist (Rekursion).
+     */
     public function committeeSituation(int $committeeEntityId, int|array $teamIds): array
     {
         $gateway = CommitteeGateways::get();
@@ -208,32 +231,42 @@ class CircleService
             ->whereIn('status', ['open', 'acknowledged'])->limit(500)->get()
             ->each(fn (Signal $s) => $this->deliver($s));
 
-        $inCommittee = Signal::query()->whereIn('team_id', (array) $teamIds)->where('committee_entity_id', $committeeEntityId)
-            ->whereIn('status', ['open', 'acknowledged'])->get();
+        $open = fn () => Signal::query()->whereIn('team_id', (array) $teamIds)->whereIn('status', ['open', 'acknowledged']);
+        $inCommittee = $open()->where('stage', 'committee')->where('committee_entity_id', $committeeEntityId)->get();
+        $escalated = $open()->where('stage', 'escalated')->where('committee_entity_id', $committeeEntityId)->get();
 
-        // Kandidaten: offene Signale an Einheiten, deren nächster LA dieser ist
-        $candidates = Signal::query()->whereIn('team_id', (array) $teamIds)->where('stage', 'unit')
-            ->whereIn('status', ['open', 'acknowledged'])->whereNotNull('unit_entity_id')->get()
-            ->filter(function (Signal $s) use ($gateway, $committeeEntityId) {
-                static $cache = [];
+        $above = [];
+        $candidates = $open()->where('stage', 'unit')->whereNotNull('unit_entity_id')->get()
+            ->filter(function (Signal $s) use ($gateway, $committeeEntityId, &$above) {
                 $u = (int) $s->unit_entity_id;
-                $cache[$u] ??= $gateway?->committeeAbove($u)['entity_id'] ?? null;
+                $above[$u] ??= $gateway?->committeeAbove($u);
 
-                return (int) $cache[$u] === $committeeEntityId;
+                return (int) ($above[$u]['entity_id'] ?? 0) === $committeeEntityId;
             })->values();
 
-        $units = $candidates->pluck('unit_entity_id')->merge($inCommittee->pluck('unit_entity_id'))->filter()->unique()->values();
+        $units = $candidates->pluck('unit_entity_id')->merge($inCommittee->pluck('unit_entity_id'))->merge($escalated->pluck('unit_entity_id'))
+            ->filter()->unique()->values();
         $unitInfo = $units->mapWithKeys(fn ($u) => [(int) $u => [
             'name' => OrganizationEntity::whereKey($u)->value('name'),
             'leader' => $this->leaderOf((int) $u),
             'frames' => $gateway ? $gateway->frames((int) $u) : [],
+            'proxy_for' => ($p = $above[(int) $u]['proxy_for_entity_id'] ?? null) ? ['entity_id' => (int) $p, 'name' => OrganizationEntity::whereKey($p)->value('name')] : null,
         ]])->all();
 
         return [
+            'committee' => $gateway?->committeeInfo($committeeEntityId) ?? ['entity_id' => $committeeEntityId, 'name' => OrganizationEntity::whereKey($committeeEntityId)->value('name')],
+            'stewards' => $gateway ? $gateway->stewards($committeeEntityId) : [],
             'next_meeting' => $meeting,
             'in_committee' => $inCommittee,
+            'escalated_here' => $escalated,
             'candidates' => $candidates,
             'units' => $unitInfo,
         ];
+    }
+
+    /** Gremien, deren Regelkreis ein Nutzer betreut (Mensch oder Agent). */
+    public function committeesFor(int $userId): array
+    {
+        return CommitteeGateways::get()?->committeesStewardedBy($userId) ?? [];
     }
 }

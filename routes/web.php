@@ -25,6 +25,7 @@ use Platform\Signals\Livewire\Signal\Index as SignalIndex;
 use Platform\Signals\Livewire\Signal\Show as SignalShow;
 use Platform\Signals\Livewire\Template\Index as TemplateIndex;
 use Platform\Signals\Livewire\Environment\Index as EnvironmentIndex;
+use Platform\Signals\Livewire\Circle\Index as CircleIndex;
 
 /**
  * Dashboard Route
@@ -43,6 +44,7 @@ Route::get('/signals', SignalIndex::class)->name('signals.signals.index');
 Route::get('/signals/{signal}', SignalShow::class)->name('signals.signals.show');
 Route::get('/templates', TemplateIndex::class)->name('signals.templates.index');
 Route::get('/environment', EnvironmentIndex::class)->name('signals.environment.index');
+Route::get('/circle', CircleIndex::class)->name('signals.circle.index');
 
 /**
  * nx-Showcase Route

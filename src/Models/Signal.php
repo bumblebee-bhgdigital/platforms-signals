@@ -43,7 +43,7 @@ class Signal extends Model implements \Platform\Core\Contracts\HasDisplayName
         'resolved_at', 'resolved_by_user_id', 'dismissed_reason', 'resolution_note', 'resolution_link_type', 'resolution_link_id',
         'legacy_organization_signal_id', 'created_at',
         'unit_entity_id', 'stage', 'committee_entity_id', 'meeting_ref_id', 'due_at', 'agenda_ref_type', 'agenda_ref_id',
-        'frame_ref_id', 'outcome',
+        'frame_ref_id', 'outcome', 'origin_committee_entity_id',
     ];
 
     protected $casts = [

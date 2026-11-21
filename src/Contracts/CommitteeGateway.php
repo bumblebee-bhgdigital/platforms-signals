@@ -9,8 +9,25 @@ namespace Platform\Signals\Contracts;
  */
 interface CommitteeGateway
 {
-    /** Nächster Lenkungsausschuss über der Einheit: ['committee_id','entity_id','name'] oder null. */
+    /**
+     * Nächster Lenkungsausschuss über der Einheit (Rekursion: der LA, dessen Träger die Einheit oder ihr nächster Vorfahr ist):
+     * ['committee_id','entity_id','name','carrier_entity_id','level' (unit|group),'proxy_for_entity_id'|null] oder null.
+     * proxy_for_entity_id: nächster Träger (vsm_class carrier) der Einheit unterhalb des LA-Trägers, der selbst keinen aktiven LA hat
+     * – der LA arbeitet dann stellvertretend für ihn.
+     */
     public function committeeAbove(int $unitEntityId): ?array;
+
+    /** Ein Gremium selbst: ['committee_id','entity_id','name','carrier_entity_id','level'] oder null. */
+    public function committeeInfo(int $committeeEntityId): ?array;
+
+    /** Nächster Lenkungsausschuss über einem Gremium (für Eskalationen eine Ebene höher) oder null. */
+    public function committeeAboveCommittee(int $committeeEntityId): ?array;
+
+    /** Wer betreut den Regelkreis dieses Gremiums? [['entity_id','name','user_id','is_agent']] – Menschen und/oder Agenten. */
+    public function stewards(int $committeeEntityId): array;
+
+    /** Gremien, deren Regelkreis ein Nutzer (Mensch oder Agent) betreut: [['committee_id','entity_id','name','level']]. */
+    public function committeesStewardedBy(int $userId): array;
 
     /** Nächste geplante Sitzung des Gremiums: ['meeting_id','title','scheduled_at'] oder null. */
     public function nextMeeting(int $committeeEntityId): ?array;

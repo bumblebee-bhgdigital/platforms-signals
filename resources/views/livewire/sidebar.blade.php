@@ -20,6 +20,10 @@
 
     <div class="mt-2" x-show="!collapsed">
         <x-ui-sidebar-list label="Arbeiten">
+            <x-ui-sidebar-item :href="route('signals.circle.index')">
+                @svg('heroicon-o-arrow-path', 'w-4 h-4 text-[var(--nx-text)]')
+                <span class="ml-2 text-sm">Regelkreis</span>
+            </x-ui-sidebar-item>
             <x-ui-sidebar-item :href="route('signals.signals.index')">
                 @svg('heroicon-o-exclamation-triangle', 'w-4 h-4 text-[var(--nx-text)]')
                 <span class="ml-2 text-sm">Signale</span>

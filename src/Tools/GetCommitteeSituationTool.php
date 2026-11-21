@@ -20,14 +20,19 @@ class GetCommitteeSituationTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /signals/committee-items - Lage eines Lenkungsausschusses für die Vorbereitung (Steward): nächste Sitzung, Signale, die schon im LA liegen, '
-            . 'und Kandidaten – offene Signale der Einheiten unter diesem LA – mit Verantwortlichem und Entscheidungsrahmen je Einheit. '
-            . 'Pflicht: committee_entity_id (Knoten des Gremiums, z. B. 39). Danach: lokal lösen (signals.signals.PUT action=solve_locally) oder nach der Faustregel in den LA heben (signals.committee_items.POST).';
+        return 'GET /signals/committee-items - Lage der Regelkreise für ihre Stewards (Mensch oder Agent). Ohne committee_entity_id: alle Gremien, deren Regelkreis der Aufrufer betreut '
+            . '(Beziehung „betreut (Regelkreis)“ in der Organisation). Je Gremium: Ebene (unit = operativ, z. B. Venture-LA; group = Gruppe), Stewards, nächste Sitzung, '
+            . 'Signale im LA, an diesen LA eskalierte Signale (von einem LA darunter) und Kandidaten – nur Signale, für die dieser LA der nächste ist (bei fehlendem eigenem LA '
+            . 'stellvertretend, siehe units.*.proxy_for) – mit Verantwortlichem und Entscheidungsrahmen je Einheit. '
+            . 'Danach: lokal lösen (signals.signals.PUT action=solve_locally) oder nach der Faustregel in den LA heben (signals.committee_items.POST).';
     }
 
     public function getSchema(): array
     {
-        return ['type' => 'object', 'properties' => ['committee_entity_id' => ['type' => 'integer', 'description' => 'ERFORDERLICH'], 'team_id' => ['type' => 'integer']], 'required' => ['committee_entity_id']];
+        return ['type' => 'object', 'properties' => [
+            'committee_entity_id' => ['type' => 'integer', 'description' => 'Optional: ein Gremium (Knoten). Ohne: alle, die ich betreue.'],
+            'team_id' => ['type' => 'integer'],
+        ]];
     }
 
     public function execute(array $arguments, ToolContext $context): ToolResult
@@ -37,14 +42,31 @@ class GetCommitteeSituationTool implements ToolContract, ToolMetadataContract
             if ($error) {
                 return $error;
             }
-            $s = app(CircleService::class)->committeeSituation((int) ($arguments['committee_entity_id'] ?? 0), $team->id);
+            $service = app(CircleService::class);
+            $ids = ! empty($arguments['committee_entity_id'])
+                ? [(int) $arguments['committee_entity_id']]
+                : array_map(fn ($c) => (int) $c['entity_id'], $service->committeesFor((int) $context->user->id));
+            if ($ids === []) {
+                return ToolResult::success(['circles' => [], 'message' => 'Du betreust keinen Regelkreis. Zuordnung über die Beziehung „betreut (Regelkreis)“ zum Gremium-Knoten.']);
+            }
+
+            $circles = [];
+            foreach ($ids as $id) {
+                $x = $service->committeeSituation($id, $team->id);
+                $circles[] = [
+                    'committee' => $x['committee'],
+                    'stewards' => $x['stewards'],
+                    'next_meeting' => $x['next_meeting'],
+                    'in_committee' => $x['in_committee']->map(fn ($s) => $this->signalToArray($s))->values()->all(),
+                    'escalated_here' => $x['escalated_here']->map(fn ($s) => $this->signalToArray($s) + ['origin_committee_entity_id' => $s->origin_committee_entity_id])->values()->all(),
+                    'candidates' => $x['candidates']->map(fn ($s) => $this->signalToArray($s))->values()->all(),
+                    'units' => $x['units'],
+                ];
+            }
 
             return ToolResult::success([
-                'next_meeting' => $s['next_meeting'],
-                'in_committee' => $s['in_committee']->map(fn ($x) => $this->signalToArray($x))->values()->all(),
-                'candidates' => $s['candidates']->map(fn ($x) => $this->signalToArray($x))->values()->all(),
-                'units' => $s['units'],
-                'rule_of_thumb' => 'In den LA nur, wenn andere Einheiten, gemeinsame Ressourcen oder strategische Prioritäten betroffen sind. Sonst lokal lösen. Eine Ampel ist keine Managementfrage.',
+                'circles' => $circles,
+                'rule_of_thumb' => 'In den LA nur, wenn andere Einheiten seiner Ebene, gemeinsame Ressourcen oder strategische Prioritäten betroffen sind. Sonst lokal lösen. Eine Ampel ist keine Managementfrage. Eskaliertes von unten ist immer ein Kandidat.',
             ]);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler: ' . $e->getMessage());

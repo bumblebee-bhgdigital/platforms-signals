@@ -100,6 +100,17 @@ Die Vorbereitung läuft **fortwährend**, nicht an einem Tag: In jedem Takt arbe
 (lokal lösen oder als Entwurf in die nächste Sitzung heben); die Agenda wächst laufend. Kurz vor der Sitzung wird nur
 noch abgeschlossen (Lagebild, Vollständigkeit der vier Fragen, offene 4a-Bestätigungen). Nach der Sitzung: Beschlüsse nachhalten.
 
+### 6b. Rekursion, Ebenen und Stewards
+- **Jeder LA hat einen Träger** (Einheit über seinem Knoten); die **Ebene** folgt aus dem Trägertyp: Venture/Einheit = operativ,
+  Venture-Träger/Holding/Gruppe = Gruppe. Kandidaten eines LA sind nur Signale, für die er der **nächste** LA ist.
+- **Stellvertretung:** Hat ein Träger (z. B. ein Venture) keinen aktiven LA, arbeitet der LA darüber stellvertretend – sichtbar als
+  „stellvertretend für …“. Aktiviert das Venture sein Book, wandern seine Signale automatisch dorthin.
+- **Eskalation** im LA einer Ebene macht das Signal zum Kandidaten im LA darüber (`origin_committee_entity_id` bleibt sichtbar).
+- **Steward** eines Regelkreises: Mensch oder Agent, beliebig viele – Beziehung „betreut (Regelkreis)“ (Code `stewards`) vom
+  Personen- oder Agenten-Knoten zum Gremium-Knoten (Übergang: verantwortlicher Agent des Gremiums). Agenten arbeiten per MCP
+  (`signals.committee_items.GET` ohne Gremium = meine Kreise), Menschen auf der Seite „Regelkreis“ – dieselbe Logik.
+- Lose: Signals kennt nur den Vertrag `CommitteeGateway`; das Book feuert allgemeine Ereignisse und kennt Signals nicht.
+
 ### 7. Lagebild
 Je Einheit (was lokal gelöst wurde, im Rahmen) und je LA-Sitzung (was ansteht, was sich zwischen Einheiten verdichtet,
 was lokal erledigt ist). Der Agent schreibt es, die Plattform füllt die Fakten vor und hängt es als Unterlage an die Sitzung.
