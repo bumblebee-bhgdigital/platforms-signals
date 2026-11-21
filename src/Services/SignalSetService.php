@@ -336,8 +336,8 @@ class SignalSetService
 
         if (! empty($out['responsible_agent_user_id'])) {
             $agent = User::find((int) $out['responsible_agent_user_id']);
-            if (! $agent || $agent->type !== 'ai_user') {
-                throw new SignalSetException('responsible_agent_user_id muss ein Agent-User (type ai_user) sein.');
+            if (! $agent || ! \Platform\Signals\Support\Agents::isAgent($agent)) {
+                throw new SignalSetException('responsible_agent_user_id muss ein Agent sein (Agent-Knoten in der Organisation oder type ai_user).');
             }
         }
 

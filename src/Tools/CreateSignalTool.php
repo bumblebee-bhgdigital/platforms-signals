@@ -99,8 +99,8 @@ class CreateSignalTool implements ToolContract, ToolMetadataContract
                 }
             }
             // Agent als Urheber (Organisations-Entity des aufrufenden Agenten), wenn vorhanden
-            if ($context->user?->type === 'ai_user' && empty($data['created_by_agent_entity_id'])) {
-                $data['created_by_agent_entity_id'] = OrganizationEntity::query()->where('linked_user_id', $context->user->id)->value('id');
+            if (empty($data['created_by_agent_entity_id'])) {
+                $data['created_by_agent_entity_id'] = \Platform\Signals\Support\Agents::entityId($context->user);
             }
 
             // Ein offenes Signal je Template/Set/Knoten: aktualisieren statt duplizieren

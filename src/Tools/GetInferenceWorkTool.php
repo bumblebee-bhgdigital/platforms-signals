@@ -60,7 +60,7 @@ class GetInferenceWorkTool implements ToolContract, ToolMetadataContract
                 return ToolResult::success(['context' => $service->build($assignment, empty($arguments['dry_run']))]);
             }
 
-            $agentId = $arguments['agent_user_id'] ?? ($context->user?->type === 'ai_user' ? $context->user->id : null);
+            $agentId = $arguments['agent_user_id'] ?? (\Platform\Signals\Support\Agents::isAgent($context->user) ? $context->user->id : null);
             $due = $service->dueAssignments($team->id, $agentId ? (int) $agentId : null, ! empty($arguments['all']));
 
             return ToolResult::success([

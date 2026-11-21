@@ -102,7 +102,7 @@ trait HandlesSignalSets
             'title' => ['type' => 'string', 'description' => 'Titel des Signal-Sets.'],
             'description' => ['type' => 'string', 'description' => 'Beschreibung / Zweck des Sets.'],
             'owner_user_id' => ['type' => 'integer', 'description' => 'Owner (User-ID, Mitglied des Teams). Default beim Anlegen: aufrufender User.'],
-            'responsible_agent_user_id' => ['type' => 'integer', 'description' => 'Verantwortlicher Agent (User-ID eines Agent-Users, type ai_user).'],
+            'responsible_agent_user_id' => ['type' => 'integer', 'description' => 'Verantwortlicher Agent (User-ID eines Agenten: Konto am Agent-Knoten der Organisation oder type ai_user).'],
         ];
     }
 }

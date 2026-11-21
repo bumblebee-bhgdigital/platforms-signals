@@ -76,7 +76,7 @@ trait SignalsHarness
         $U = \Platform\Core\Models\User::class;
         $user = $U::create(['name' => 'Martin', 'email' => 'm@x.test', 'password' => 'x']);
         $agent = $U::create(['name' => 'Ratchet', 'email' => 'r@x.test', 'password' => 'x']);
-        $agent->forceFill(['type' => 'ai_user'])->save();
+        // wie auf office: der Agent ist ein normales Konto, das an einem Agent-Knoten der Organisation hängt
         $teamId = DB::table('teams')->insertGetId(['name' => 'T1', 'user_id' => $user->id, 'personal_team' => false, 'created_at' => now(), 'updated_at' => now()]);
         DB::table('team_user')->insert(['team_id' => $teamId, 'user_id' => $user->id, 'role' => 'owner', 'created_at' => now(), 'updated_at' => now()]);
         DB::table('team_user')->insert(['team_id' => $teamId, 'user_id' => $agent->id, 'role' => 'member', 'created_at' => now(), 'updated_at' => now()]);
@@ -86,7 +86,7 @@ trait SignalsHarness
         $team = \Platform\Core\Models\Team::find($teamId);
 
         $group = $this->row('organization_entity_type_groups', ['code' => 'units', 'name' => 'Einheiten', 'team_id' => $teamId, 'is_active' => true, 'sort_order' => 1]);
-        $type = $this->row('organization_entity_types', ['code' => 'business_unit', 'name' => 'Einheit', 'team_id' => $teamId, 'is_active' => true, 'sort_order' => 1, 'entity_type_group_id' => $group]);
+        $type = DB::table('organization_entity_types')->where('code', 'business_unit')->value('id') ?? $this->row('organization_entity_types', ['code' => 'business_unit', 'name' => 'Einheit', 'team_id' => $teamId, 'is_active' => true, 'sort_order' => 1, 'entity_type_group_id' => $group]);
         $e = fn ($name, $parent = null, array $extra = []) => $this->row('organization_entities', $extra + [
             'name' => $name, 'team_id' => $teamId, 'user_id' => $user->id, 'entity_type_id' => $type, 'parent_entity_id' => $parent, 'is_active' => true,
         ]);
@@ -95,7 +95,8 @@ trait SignalsHarness
         $this->ids['a1'] = $e('Projekt A1', $this->ids['a']);
         $this->ids['a2'] = $e('Projekt A2', $this->ids['a']);
         $this->ids['b'] = $e('Einheit B', $this->ids['group']);
-        $this->ids['ratchet'] = $e('Ratchet', null, ['linked_user_id' => $agent->id]);
+        $agentType = DB::table('organization_entity_types')->where('code', 'agent')->value('id') ?? $this->row('organization_entity_types', ['code' => 'agent', 'name' => 'Agent', 'team_id' => $teamId, 'is_active' => true, 'sort_order' => 2, 'entity_type_group_id' => $group]);
+        $this->ids['ratchet'] = $e('Ratchet', null, ['linked_user_id' => $agent->id, 'entity_type_id' => $agentType]);
 
         $this->s = compact('user', 'agent', 'team', 'teamId');
     }

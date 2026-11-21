@@ -201,7 +201,7 @@ class SignalService
         return $signal->comments()->create([
             'parent_id' => $parentId,
             'user_id' => $by?->id,
-            'author_context' => $authorContext ?: ($by?->type === 'ai_user' ? 'agent' : 'user'),
+            'author_context' => $authorContext ?: (\Platform\Signals\Support\Agents::isAgent($by) ? 'agent' : 'user'),
             'content' => $content,
         ]);
     }
