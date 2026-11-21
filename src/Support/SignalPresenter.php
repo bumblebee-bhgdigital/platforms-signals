@@ -36,7 +36,7 @@ class SignalPresenter
     public static function rule(SignalTemplate $t, ?array $conditions = null): string
     {
         if ($t->isInference()) {
-            return 'KI · ' . strtoupper((string) ($t->vsm_system ?: '–')) . ($t->data_sources ? ' · ' . implode(', ', $t->data_sources) : '');
+            return 'KI · ' . strtoupper((string) ($t->vsm_system ?: '–'));
         }
         $c = $conditions ?? (array) $t->conditions;
 

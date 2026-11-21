@@ -17,7 +17,7 @@ class SignalTemplateService
 {
     public const FIELDS = [
         'kind', 'name', 'description', 'severity', 'is_active', 'pattern_type', 'conditions', 'frequency',
-        'prompt', 'vsm_system', 'data_sources', 'dimension', 'schedule_interval_hours',
+        'prompt', 'vsm_system', 'dimension', 'schedule_interval_hours',
     ];
 
     /** Pflichtfelder der conditions je Muster. */
@@ -142,9 +142,6 @@ class SignalTemplateService
             $vsm = $out['vsm_system'] ?? $existing?->vsm_system;
             if ($vsm !== null && ! in_array($vsm, SignalTemplate::VSM_SYSTEMS, true)) {
                 throw new SignalSetException('vsm_system muss s1, s2, s3, s3_star, s4 oder s5 sein.');
-            }
-            if (isset($out['data_sources']) && ! is_array($out['data_sources'])) {
-                throw new SignalSetException('data_sources muss eine Liste sein.');
             }
             if (array_key_exists('schedule_interval_hours', $out)) {
                 $out['schedule_interval_hours'] = $out['schedule_interval_hours'] ? max(1, (int) $out['schedule_interval_hours']) : null;

@@ -43,7 +43,7 @@ class SignalsInferenceTest extends TestCase
         $sets->activate($this->set);
         $this->template = app(SignalTemplateService::class)->create($this->s['user'], $this->s['teamId'], [
             'name' => 'Stille Einheiten', 'kind' => 'inference', 'vsm_system' => 's3_star', 'severity' => 'warning',
-            'prompt' => 'Welche Einheiten zeigen keine Bewegung?', 'data_sources' => ['snapshots', 'movement'], 'schedule_interval_hours' => 72,
+            'prompt' => 'Welche Einheiten zeigen keine Bewegung?', 'schedule_interval_hours' => 72,
         ]);
         $this->assignment = app(SignalTemplateService::class)->attach($this->set, $this->template);
         $this->snapshot($this->ids['a1'], ['items_open' => 3]);
@@ -62,7 +62,8 @@ class SignalsInferenceTest extends TestCase
         $this->assertSame('Welche Einheiten zeigen keine Bewegung?', $c['assignment']['prompt']);
         $this->assertEqualsCanonicalizing([$this->ids['a'], $this->ids['a1'], $this->ids['a2']], array_column($c['entities'], 'id'), 'nur die Knoten des Sets');
         $a1 = collect($c['entities'])->firstWhere('id', $this->ids['a1']);
-        $this->assertSame(3, $a1['snapshot_latest']['items_open']);
+        $this->assertArrayNotHasKey('snapshot_latest', $a1, 'Daten liest der Agent selbst – Signals sammelt nichts vor');
+        $this->assertStringContainsString('tool_registry.SEARCH', $c['how_to_answer']);
 
         $this->assertSame(0, $this->tool(GetInferenceWorkTool::class, [], $this->s['agent'])->data['count'], 'nach dem Auswerten nicht mehr fällig');
 

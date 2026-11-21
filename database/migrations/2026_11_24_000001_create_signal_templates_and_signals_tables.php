@@ -35,7 +35,6 @@ return new class extends Migration
                 // kind = inference
                 $table->longText('prompt')->nullable();
                 $table->string('vsm_system', 10)->nullable(); // s1 … s5, s3_star
-                $table->json('data_sources')->nullable();
                 $table->string('dimension', 50)->nullable();
                 $table->unsignedInteger('schedule_interval_hours')->nullable();
                 $table->unsignedBigInteger('created_by_user_id')->nullable();

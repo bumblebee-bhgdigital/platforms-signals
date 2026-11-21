@@ -51,8 +51,6 @@ class SignalsUiTest extends TestCase
         $this->get(route('signals.signals.index'))->assertOk()->assertSee('Projekt A1')->assertSee('Basis');
         $this->get(route('signals.signals.show', $signal))->assertOk()->assertSee('Wodurch erledigt')->assertSee('Ratchet');
         $this->get(route('signals.templates.index'))->assertOk()->assertSee('Überlast');
-        \Platform\Signals\Models\SignalEnvironmentSource::create(['team_id' => $this->s['teamId'], 'name' => 'foodservice.de', 'category' => 'gastronomy', 'config' => ['url' => 'https://x.test']]);
-        $this->get(route('signals.environment.index'))->assertOk()->assertSee('foodservice.de');
     }
 
     public function test_resolve_from_the_detail_page_and_dry_run_on_the_set_page(): void

@@ -182,7 +182,7 @@ class SignalsCoreTest extends TestCase
     {
         $r = $this->tool(CreateSignalTemplateTool::class, [
             'name' => 'Stille Einheiten', 'kind' => 'inference', 'vsm_system' => 's3_star', 'severity' => 'warning',
-            'prompt' => 'Welche Einheiten zeigen keine Bewegung?', 'data_sources' => ['snapshots', 'movement'], 'signal_set_id' => $this->set->id,
+            'prompt' => 'Welche Einheiten zeigen keine Bewegung?', 'signal_set_id' => $this->set->id,
         ]);
         $this->assertTrue($r->success, json_encode($r->error ?? null));
         $templateId = $r->data['template']['id'];

@@ -74,7 +74,6 @@
                     <x-nx-input-text name="form.dimension" label="Dimension" wire:model="form.dimension" />
                     <x-nx-input-number name="form.schedule_interval_hours" label="Takt (Stunden)" wire:model="form.schedule_interval_hours" />
                 </div>
-                <x-nx-input-text name="dataSources" label="Kontext (kommagetrennt)" wire:model="dataSources" />
                 <p class="text-xs text-[color:var(--nx-muted)]">Ausgewertet wird vom verantwortlichen Agenten des Sets per MCP – nicht vom Server.</p>
             @endif
         </div>

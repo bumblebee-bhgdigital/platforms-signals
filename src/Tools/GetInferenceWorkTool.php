@@ -23,8 +23,8 @@ class GetInferenceWorkTool implements ToolContract, ToolMetadataContract
     {
         return 'GET /signals/inference - Auswertung der KI-Templates durch den verantwortlichen Agenten (ersetzt den alten Server-Runner). '
             . 'Ohne assignment_id: Liste der fälligen KI-Zuordnungen (Set + Template) – als Agent standardmäßig nur die eigenen (verantwortlicher Agent des Sets); all=true auch nicht fällige, '
-            . 'agent_user_id filtert auf einen Agenten. Mit assignment_id: vollständiger Kontext zur Auswertung (Prompt, Knoten des Sets mit Snapshots und Bewegung, '
-            . 'Korrespondenz, Aufnahmen, Aktivität, Umwelt, Strategie je data_sources, offene Signale, Gedächtnis) und markiert die Zuordnung als ausgewertet. '
+            . 'agent_user_id filtert auf einen Agenten. Mit assignment_id: Frage (Prompt), Knoten des Sets, offene Signale und Gedächtnis – und markiert die Zuordnung als ausgewertet. '
+            . 'Daten (Kennzahlen, Korrespondenz, Aufnahmen, Umwelt, Strategie …) liest du selbst über die Tools der zuständigen Module. '
             . 'Danach: signals.signals.POST für Befunde bzw. signals.inference.POST outcome=nothing.';
     }
 

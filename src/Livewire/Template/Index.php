@@ -17,7 +17,6 @@ class Index extends Component
     public ?int $editId = null;
     public array $form = [];
     public string $conditionsJson = '';
-    public string $dataSources = '';
     public ?string $error = null;
 
     private function teamId(): int
@@ -30,7 +29,6 @@ class Index extends Component
         $this->editId = null;
         $this->form = ['kind' => $kind, 'name' => '', 'description' => '', 'severity' => 'warning', 'pattern_type' => 'threshold', 'frequency' => 'every_snapshot', 'prompt' => '', 'vsm_system' => 's3_star', 'dimension' => '', 'schedule_interval_hours' => 168, 'is_active' => true];
         $this->conditionsJson = json_encode(['metric' => 'items_open', 'operator' => '>', 'value' => 50], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        $this->dataSources = 'snapshots, movement';
         $this->error = null;
         $this->showForm = true;
     }
@@ -41,7 +39,6 @@ class Index extends Component
         $this->editId = $t->id;
         $this->form = $t->only(['kind', 'name', 'description', 'severity', 'pattern_type', 'frequency', 'prompt', 'vsm_system', 'dimension', 'schedule_interval_hours', 'is_active']);
         $this->conditionsJson = json_encode($t->conditions ?? new \stdClass(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        $this->dataSources = implode(', ', (array) $t->data_sources);
         $this->error = null;
         $this->showForm = true;
     }
@@ -60,7 +57,6 @@ class Index extends Component
             $data['conditions'] = $conditions;
             unset($data['prompt'], $data['vsm_system'], $data['dimension'], $data['schedule_interval_hours']);
         } else {
-            $data['data_sources'] = array_values(array_filter(array_map('trim', explode(',', $this->dataSources))));
             unset($data['pattern_type'], $data['frequency']);
         }
 

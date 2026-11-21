@@ -30,13 +30,12 @@ class SignalTemplate extends Model
     protected $fillable = [
         'uuid', 'team_id', 'kind', 'name', 'description', 'severity', 'is_active',
         'pattern_type', 'conditions', 'frequency',
-        'prompt', 'vsm_system', 'data_sources', 'dimension', 'schedule_interval_hours',
+        'prompt', 'vsm_system', 'dimension', 'schedule_interval_hours',
         'created_by_user_id',
     ];
 
     protected $casts = [
         'conditions' => 'array',
-        'data_sources' => 'array',
         'is_active' => 'boolean',
         'schedule_interval_hours' => 'integer',
     ];

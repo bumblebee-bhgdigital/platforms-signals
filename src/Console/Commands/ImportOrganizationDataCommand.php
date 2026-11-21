@@ -5,8 +5,6 @@ namespace Platform\Signals\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Platform\Signals\Models\SignalEnvironmentSnapshot;
-use Platform\Signals\Models\SignalEnvironmentSource;
 use Platform\Signals\Models\SignalMemoryEntry;
 use Platform\Signals\Models\SignalTemplate;
 
@@ -20,9 +18,9 @@ use Platform\Signals\Models\SignalTemplate;
  */
 class ImportOrganizationDataCommand extends Command
 {
-    protected $signature = 'signals:import-organization {--team= : Team-ID (Root-Team)} {--dry-run : nur zählen} {--keep-sources-active : alte Quellen nicht deaktivieren}';
+    protected $signature = 'signals:import-organization {--team= : Team-ID (Root-Team)} {--dry-run : nur zählen}';
 
-    protected $description = 'Übernimmt Umweltquellen, Snapshots und Gedächtnis aus der Organisation ins Signals-Modul (idempotent).';
+    protected $description = 'Übernimmt das Gedächtnis aus der Organisation ins Signals-Modul (idempotent). Umweltquellen nicht – externe Daten liest der Agent selbst.';
 
     public function handle(): int
     {
@@ -34,50 +32,7 @@ class ImportOrganizationDataCommand extends Command
         }
         $dry = (bool) $this->option('dry-run');
 
-        $report = ['sources' => 0, 'sources_skipped' => 0, 'snapshots' => 0, 'memory' => 0, 'memory_skipped' => 0, 'deactivated' => 0];
-        $sourceMap = [];
-
-        if (Schema::hasTable('organization_environment_sources')) {
-            foreach (DB::table('organization_environment_sources')->where('team_id', $teamId)->whereNull('deleted_at')->orderBy('id')->get() as $old) {
-                $new = SignalEnvironmentSource::withTrashed()->where('legacy_organization_source_id', $old->id)->first();
-                if ($new) {
-                    $report['sources_skipped']++;
-                } else {
-                    $report['sources']++;
-                    if ($dry) {
-                        continue;
-                    }
-                }
-                $new ??= SignalEnvironmentSource::create([
-                    'team_id' => $old->team_id, 'user_id' => $old->user_id, 'name' => $old->name, 'source_type' => $old->source_type,
-                    'category' => $old->category, 'cluster' => $old->cluster ?? null, 'config' => json_decode($old->config, true) ?: [],
-                    'pull_interval_hours' => $old->pull_interval_hours, 'is_active' => (bool) $old->is_active,
-                    'last_pulled_at' => $old->last_pulled_at, 'legacy_organization_source_id' => $old->id,
-                ]);
-                $sourceMap[$old->id] = $new->id;
-                if ($dry) {
-                    continue;
-                }
-
-                foreach (DB::table('organization_environment_snapshots')->where('source_id', $old->id)->orderBy('id')->get() as $snap) {
-                    if (SignalEnvironmentSnapshot::query()->where('legacy_organization_snapshot_id', $snap->id)->exists()) {
-                        continue;
-                    }
-                    SignalEnvironmentSnapshot::create([
-                        'team_id' => $snap->team_id, 'source_id' => $new->id, 'snapshot_date' => $snap->snapshot_date,
-                        'metrics' => json_decode($snap->metrics, true) ?: [], 'summary' => (string) $snap->summary,
-                        'raw_items' => $snap->raw_items ? (json_decode($snap->raw_items, true) ?: []) : [],
-                        'created_at' => $snap->created_at, 'legacy_organization_snapshot_id' => $snap->id,
-                    ]);
-                    $report['snapshots']++;
-                }
-            }
-
-            if (! $dry && ! $this->option('keep-sources-active') && $sourceMap !== []) {
-                $report['deactivated'] = DB::table('organization_environment_sources')->whereIn('id', array_keys($sourceMap))
-                    ->where('is_active', true)->update(['is_active' => false, 'updated_at' => now()]);
-            }
-        }
+        $report = ['memory' => 0, 'memory_skipped' => 0];
 
         if (Schema::hasTable('organization_memory_entries')) {
             $promptNames = Schema::hasTable('organization_signal_inference_prompts')
@@ -85,7 +40,8 @@ class ImportOrganizationDataCommand extends Command
                 : [];
             $templateByName = SignalTemplate::query()->where('team_id', $teamId)->where('kind', 'inference')->pluck('id', 'name')->all();
 
-            foreach (DB::table('organization_memory_entries')->where('team_id', $teamId)->whereNull('deleted_at')->orderBy('id')->get() as $old) {
+            // source_relevance hing an Umweltquellen – die gibt es in Signals nicht
+            foreach (DB::table('organization_memory_entries')->where('team_id', $teamId)->whereNull('deleted_at')->where('memory_type', '!=', 'source_relevance')->orderBy('id')->get() as $old) {
                 if (SignalMemoryEntry::withTrashed()->where('legacy_organization_memory_id', $old->id)->exists()) {
                     $report['memory_skipped']++;
                     continue;
@@ -95,10 +51,6 @@ class ImportOrganizationDataCommand extends Command
                     continue;
                 }
                 $data = $old->structured_data ? (json_decode($old->structured_data, true) ?: []) : [];
-                if ($old->memory_type === 'source_relevance' && isset($data['source_id']) && isset($sourceMap[$data['source_id']])) {
-                    $data['legacy_source_id'] = $data['source_id'];
-                    $data['source_id'] = $sourceMap[$data['source_id']];
-                }
                 $templateId = null;
                 if ($old->inference_prompt_id && isset($promptNames[$old->inference_prompt_id])) {
                     $templateId = $templateByName[$promptNames[$old->inference_prompt_id]] ?? null;
@@ -116,8 +68,8 @@ class ImportOrganizationDataCommand extends Command
         }
 
         $this->info(($dry ? '[Probelauf] ' : '') . sprintf(
-            'Quellen: %d neu (%d schon da) · Snapshots: %d · Gedächtnis: %d neu (%d schon da) · alte Quellen deaktiviert: %d',
-            $report['sources'], $report['sources_skipped'], $report['snapshots'], $report['memory'], $report['memory_skipped'], $report['deactivated'],
+            'Gedächtnis: %d neu (%d schon da)',
+            $report['memory'], $report['memory_skipped'],
         ));
 
         return self::SUCCESS;

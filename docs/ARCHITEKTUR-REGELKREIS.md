@@ -120,6 +120,11 @@ noch abgeschlossen (Lagebild, Vollständigkeit der vier Fragen, offene 4a-Bestä
 - Verweise (resolution_link) sind Morph-Aliase, die Module selbst registrieren – Signals führt keine Liste fremder Klassen.
 - Tests: Signals gegen ein Test-Double des Vertrags und mit nichtssagenden Typ-Codes; das Book testet seine Umsetzung des Vertrags.
 
+### 6c. Signals sammelt keine Daten vor
+Externe und interne Daten (Kennzahlen, Korrespondenz, Aufnahmen, Aktivität, Umwelt/RSS, Strategie) gehören in ihre Module.
+Agenten und Menschen lesen sie selbst – nur so viel, wie die Frage braucht. Signals liefert zur Auswertung nur eigenes Wissen
+(Frage, Knoten, offene Signale, Gedächtnis) und hält das Ergebnis fest. Keine Umweltquellen, keine Abruf-Jobs, keine data_sources.
+
 ### 7. Lagebild
 Je Einheit (was lokal gelöst wurde, im Rahmen) und je LA-Sitzung (was ansteht, was sich zwischen Einheiten verdichtet,
 was lokal erledigt ist). Der Agent schreibt es, die Plattform füllt die Fakten vor und hängt es als Unterlage an die Sitzung.

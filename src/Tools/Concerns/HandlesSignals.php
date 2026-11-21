@@ -29,7 +29,7 @@ trait HandlesSignals
             $out += ['pattern_type' => $t->pattern_type, 'conditions' => $t->conditions, 'frequency' => $t->frequency];
         } else {
             $out += [
-                'prompt' => $t->prompt, 'vsm_system' => $t->vsm_system, 'data_sources' => $t->data_sources,
+                'prompt' => $t->prompt, 'vsm_system' => $t->vsm_system,
                 'dimension' => $t->dimension, 'schedule_interval_hours' => $t->schedule_interval_hours,
             ];
         }
