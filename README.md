@@ -44,8 +44,7 @@ Direkt vs. vererbt: `SignalSetService::setsForNode()` bzw. `signals.signal_sets.
 - **Gedächtnis** (`SignalMemoryEntry`, `signal_memory_entries`): Rückmeldungen zu KI-Signalen (bestätigt/gelöst → baseline, verworfen → suppression)
   und Beobachtungen der Agenten; `signals.memory.GET/POST/PUT/DELETE`.
 
-- **Umzug der Verlaufsdaten**: `signals:import-organization --team=<root> [--dry-run]` übernimmt das Gedächtnis
-  idempotent (legacy-IDs, Umschlüsselung). Regeln/Prompts/Sets werden per MCP umgezogen.
+- **Neustart statt Umzug** (2026-11-22): Altsignale und Gedächtnis der Organisation werden nicht übernommen; Signals wertet ab dem Neustart nur mit den eigenen Templates aus.
 
 MCP: `signals.templates.GET/POST/PUT/DELETE`, `signals.set_templates.PUT`, `signals.signals.GET/POST/PUT`, `signals.evaluate.POST` (Probelauf),
 `signals.inference.GET/POST`, `signals.memory.GET/POST/PUT/DELETE`, `signals.committee_items.GET/POST`.

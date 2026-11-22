@@ -61,7 +61,6 @@ class SignalsServiceProvider extends ServiceProvider
             $this->commands([
                 \Platform\Signals\Console\Commands\EvaluateSignalsCommand::class,
                 \Platform\Signals\Console\Commands\EscalateSignalsCommand::class,
-                \Platform\Signals\Console\Commands\ImportOrganizationDataCommand::class,
             ]);
         }
     }
