@@ -39,23 +39,19 @@ Direkt vs. vererbt: `SignalSetService::setsForNode()` bzw. `signals.signal_sets.
 - **Algedonic-Knopf**: Listener auf `Core\Events\AlgedonicTriggered`; übernimmt erst, wenn der Listener der Organisation zurückgebaut ist.
 
 - **KI-Auswertung durch Agenten** (`InferenceContextService`): `signals.inference.GET` liefert die fälligen KI-Zuordnungen des Agenten bzw.
-  mit `assignment_id` den Kontext (Knoten des Sets mit Snapshots/Bewegung, Korrespondenz, Aufnahmen, Aktivität, Umwelt, Strategie, offene Signale,
-  Gedächtnis); Befunde per `signals.signals.POST`, „nichts gefunden“ per `signals.inference.POST`.
+  mit `assignment_id` die Frage samt Knoten, offenen Signalen und Gedächtnis. Daten sammelt Signals nicht vor: der Agent liest sie selbst
+  über die Tools der Module (`tool_registry.SEARCH`, Umwelt-Feeds z. B. `radar.items.GET`); Befunde per `signals.signals.POST`, „nichts gefunden“ per `signals.inference.POST`.
 - **Gedächtnis** (`SignalMemoryEntry`, `signal_memory_entries`): Rückmeldungen zu KI-Signalen (bestätigt/gelöst → baseline, verworfen → suppression)
   und Beobachtungen der Agenten; `signals.memory.GET/POST/PUT/DELETE`.
 
-- **Umwelt (VSM S4, #1046)**: `SignalEnvironmentSource`/`SignalEnvironmentSnapshot`, Abruf RSS/KPI mit Extraktion (`EnvironmentPullService`,
-  `signals:pull-environment-sources` stündlich, Intervall je Quelle), gelernte Relevanz (`source_relevance` im Gedächtnis, `signals:decay-environment-relevance`
-  wöchentlich), Kontext mit Bewegung (`EnvironmentContextService`) für KI-Templates und Agent-API `GET /api/signals/agent/environment` (Perceptor).
-- **Umzug der Verlaufsdaten**: `signals:import-organization --team=<root> [--dry-run]` übernimmt Umweltquellen + Snapshots und das Gedächtnis
-  idempotent (legacy-IDs, Umschlüsselung) und deaktiviert die alten Quellen. Regeln/Prompts/Sets werden per MCP umgezogen.
+- **Umzug der Verlaufsdaten**: `signals:import-organization --team=<root> [--dry-run]` übernimmt das Gedächtnis
+  idempotent (legacy-IDs, Umschlüsselung). Regeln/Prompts/Sets werden per MCP umgezogen.
 
 MCP: `signals.templates.GET/POST/PUT/DELETE`, `signals.set_templates.PUT`, `signals.signals.GET/POST/PUT`, `signals.evaluate.POST` (Probelauf),
-`signals.inference.GET/POST`, `signals.memory.GET/POST/PUT/DELETE`, `signals.environment_sources.GET/POST/PUT/DELETE`,
-`signals.environment_sources.rate`, `signals.environment_snapshots.GET`.
-Oberfläche: Set-Seite (Templates, Probelauf, Signale), `/signals/signals` (Arbeitsliste + Detail), `/signals/templates`, `/signals/environment`.
+`signals.inference.GET/POST`, `signals.memory.GET/POST/PUT/DELETE`, `signals.committee_items.GET/POST`.
+Oberfläche: Set-Seite (Templates, Probelauf, Signale), `/signals/signals` (Arbeitsliste + Detail), `/signals/templates`, `/signals/circle` (Regelkreis).
 
-Tests: `tests/run-in-taiste.sh tests/Feature/SignalsCoreTest.php tests/Feature/SignalsUiTest.php tests/Feature/SignalsInferenceTest.php tests/Feature/SignalsEnvironmentTest.php`
+Tests: `tests/run-in-taiste.sh tests/Feature/SignalsCoreTest.php tests/Feature/SignalsUiTest.php tests/Feature/SignalsInferenceTest.php tests/Feature/SignalsCircleTest.php`
 
 ## Regelkreis Einheit → Lenkungsausschuss (Architektur v2, `docs/ARCHITEKTUR-REGELKREIS.md`)
 
