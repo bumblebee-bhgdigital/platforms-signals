@@ -1,6 +1,6 @@
 # Architektur: Signale im Regelkreis des BROICH.MANAGEMENTMODELLS
 
-Stand 2026-11-21 · Entwurf v2 · abgeglichen mit Academy MGT-101 („Management als System“), insbesondere
+Stand 2026-11-22 · Entwurf v3 (Zustellung und Eskalation) · abgeglichen mit Academy MGT-101 („Management als System“), insbesondere
 „Der Lenkungsausschuss – lokal vor übergreifend“, „Die vier Fragen“, „Hilfe statt Macht“, „Der Regelkreis“.
 
 ## Ziel
@@ -136,12 +136,135 @@ Signale an die Einheit und LA-Entwürfe werden Vorgänge in Parlan beim Verantwo
 Gedächtnis aus Rückmeldungen (gibt es). Treffsicherheit je Template; Maßstab je Einheit und Gremium:
 Anteil lokal gelöst, Anteil im LA, Ergebnis-Checks „handlungsfähiger“.
 
+## Zustellung und Eskalation (v3, 2026-11-22)
+
+Leitgedanke: **Ein Signal geht an den nächstmöglichen Verantwortlichen – egal, wo das Set hängt.** Signale sind nicht
+schlimm; schlimm ist ein Signal, auf das niemand reagiert. Die UX muss einfach sein: ein Mensch versteht drei Knöpfe.
+
+### Z1. Sets: eines oben, vererbt – das nächste gewinnt
+- Das **allgemeine Set** hängt an BHG.DIGITAL und vererbt sich auf alle Ventures und alles darunter.
+- Ein Set weiter unten (z. B. an einem Venture) **übernimmt** (nichts tun), **passt an** (Schwelle, Schweregrad,
+  Eskalation) oder **wählt ab** („gilt bei uns nicht“). Pro Knoten und Template gilt **die nächste Zuordnung im Baum**.
+- Eine Zuordnung oben kann **verbindlich** sein: unten anpassbar, nicht abwählbar (z. B. Liquidität).
+- Folge: **höchstens ein offenes Signal je Knoten und Template**, egal wie viele Sets darüber hängen. Die gewinnende
+  Zuordnung bestimmt Empfänger-Fähigkeit, Zustellung und Eskalation.
+- Der Typ-Filter `entity_types` (Knotentyp-Codes) entfällt – Abwahl am Set ersetzt ihn, Typ-Codes kennt Signals nicht.
+
+### Z2. Empfänger: der nächste Verantwortliche, von unten gesucht
+- **Verantwortlich** = hält am Knoten eine Beziehung oder Rolle mit der Fähigkeit **`manage`** (heute: „Führt an“,
+  „Venture Owner von“, „Venture Co-Owner von“). Signals kennt keine Beziehungsnamen, nur die Fähigkeit.
+- Signals fragt die Organisation: *„Wer ist jetzt verantwortlich für Knoten X mit Fähigkeit C?“* – ab dem Knoten des
+  Signals aufwärts, bis jemand gefunden ist. Die Organisation beantwortet das aus **Rang, Vertretung und Abwesenheit**
+  (Z6) und liefert eine geordnete Liste mit Begründung.
+- **Mehrere Verantwortliche** am selben Knoten (Owner + Co-Owner): ein Vorgang als **offene Aufgabe**, wer zuerst
+  übernimmt, hat ihn.
+- **Befangen:** Betrifft das Signal den Empfänger selbst (z. B. Überlast einer Person), wird er übersprungen. Signale
+  über Personen sehen nur Betroffener und Nächsthöherer.
+- **Agent als Verantwortlicher** ist erlaubt; bei kritisch und Eskalation ist sein Mensch (Vorgesetzter im Profil) mit dabei.
+- **Mehrere Einheiten betroffen:** Empfänger ist der Verantwortliche des gemeinsamen Elternknotens.
+- Der **Agent des Sets** ist nicht Empfänger, sondern **Absender und Begleiter** (allgemeines Set: Ironhide).
+
+### Z3. Eskalation: nur wenn nichts passiert – eine Stufe
+Auslöser je Kontext (Knoten + Template), alle Werte an der Zuordnung im Set:
+
+| Auslöser | Bedeutung | Beispiel-Standard |
+|---|---|---|
+| **ignoriert** | in der Reaktionszeit weder angenommen noch gelöst noch abgelehnt | 3 Arbeitstage |
+| **wiederkehrend** | dieselbe Sache kommt im Zeitfenster N-mal (auch nach Auto-Auflösung) | 3× in 30 Tagen |
+| **dauerhaft** | angenommen, aber zu lange offen | 14 Tage |
+| **abgelehnt** | „gehört nicht zu mir“ (mit Begründung) | sofort |
+
+**Eskalationsziel** je Zuordnung: *keins* (bleibt im Lagebild) · *Linie* (nächster Verantwortlicher darüber) ·
+*Gremium* (der Steward bereitet den LA-Punkt nach den vier Fragen vor, Z5). An der Spitze einer Einheit folgt auf die
+Linie ihr eigenes Gremium, erst danach die Ebene darüber. **Algedonisch** ist der einzige Sofortkanal an einen Menschen.
+Die alte Zeitleiter (Frist ⇒ VSM-Ebene und Schweregrad automatisch hoch, `signals:escalate`) entfällt.
+
+Fristen rechnet **der Zeitplan von Signals**, nicht der Agent – fällt ein Agent aus, bleibt nichts liegen.
+Gerechnet wird in Arbeitstagen; pro Person höchstens N neue Vorgänge am Tag, der Rest gebündelt.
+
+### Z4. Zustellung: ein Signal, ein Vorgang
+- Zustellung je Zuordnung: *Lagebild* (Seite + gebündelte Morgen-Nachricht) · *Vorgang*. Standard: Hinweis/Warnung →
+  Lagebild; kritisch, weitergereicht, „Einheit ohne Verantwortlichen“, algedonisch → Vorgang.
+- Der Vorgang ist eine **Parlan-Aufgabe im Kontext-Raum der Einheit** (den Raum gibt es je Knoten bereits). Kein
+  zentraler Signal-Kanal (Rauschen für alle), kein Direktgespräch (dort kann nicht übergeben werden).
+- **Ein Vorgang über die ganze Lebensdauer:** Erinnerungen und Hinweise sind Kommentare; Eskalation = der Nächste wird
+  in den Raum aufgenommen und bekommt **denselben Vorgang übergeben**; kommt die Sache wieder, wird der alte Vorgang
+  wieder geöffnet („zum 3. Mal in 30 Tagen“).
+
+| Parlan | Signal |
+|---|---|
+| annehmen | gesehen/übernommen – Reaktionsuhr stoppt |
+| erledigt (Notiz) | gelöst – Notiz wird Lösung |
+| ablehnen (Begründung) | gehört nicht zu mir – eine Stufe weiter |
+| übergeben | Eskalation |
+| Kommentar | Erinnerung, Rückfrage, Hinweis des Agenten |
+
+- **Lose:** Vertrag `DeliveryChannel` in Signals (Vorgang anlegen, übergeben, kommentieren, wieder öffnen, schließen;
+  Callback für annehmen/erledigt/abgelehnt). Umgesetzt im Modul mit der Parlan-Verbindung. Ohne Kanal läuft Signals
+  über die Seite. Signals wird gegen ein Test-Double getestet.
+
+### Z5. Ins Management Book nur, was eine Entscheidung braucht
+Eskalationsziel *Gremium* oder die Linie reicht an der Spitze einer Einheit nicht ⇒ der Agent des Sets bereitet den
+Punkt nach den vier Fragen vor ⇒ Entwurfs-Agendapunkt im LA **dieser** Einheit (bei einem Venture dessen LA) ⇒ Mensch
+bestätigt, LA entscheidet ⇒ Ausgang über `CommitteeGateway` zurück (Maßnahme, Rückgabe mit Rahmen, Eskalation,
+Strategiethema). Ein Rahmen-Beschluss erlaubt beim nächsten ähnlichen Signal das lokale Lösen. Der Parlan-Vorgang läuft
+durch: „liegt im LA, Sitzung am …“, Beschluss als Kommentar, zurück an den Verantwortlichen oder geschlossen.
+Regel-Treffer, Hinweise und lokal Gelöstes gehen nicht ins Book.
+
+### Z6. Zuständigkeit als Plattform-Fähigkeit (Organisation + People)
+Die Frage „wer ist jetzt zuständig?“ brauchen auch Planner, Helpdesk und Book – sie gehört nicht in Signals.
+
+| Modul | Trägt |
+|---|---|
+| **Organisation** | **Rang** an Beziehungsarten und Rollen (Owner vor Co-Owner, „Führt an“ vor Projektleitung) · **Vertretung** („A vertritt B“, generell oder je Knoten, optional nur bei Abwesenheit; sonst rückt der Nächste im Rang am Knoten nach) · die **Abfrage** „verantwortlich für Knoten X mit Fähigkeit C“ (geordnet, mit Begründung) · Vertrag **Verfügbarkeit** (`isAbsent(person, Zeitraum)`) |
+| **People** | **Abwesenheiten** (Zeitraum, Art, Quelle manuell oder M365-Abwesenheitsnotiz); bindet den Vertrag Verfügbarkeit. Agenten: abwesend = offline (Heartbeat der Organisation). Ohne Bindung gelten alle als anwesend. |
+| **Signals** | stellt nur die eine Frage an die Organisation; kennt weder Rang noch Vertretung noch Abwesenheit. |
+
+Abhängigkeit wie beim Agenten-Gedächtnis: Organisation definiert den Vertrag, People bindet ihn (nie Organisation → People).
+
+### Z7. „Einheit ohne Verantwortlichen“
+Verbindliches Template im allgemeinen Set: jede Einheit (VSM-Klasse *carrier*) ohne jemanden mit `manage`. Geht an den
+nächsten Verantwortlichen **darüber** (er muss benennen), hoher Schweregrad, Vorgang. Solange offen, rutschen die Signale
+der Einheit eine Stufe höher – sichtbar mit Grund. Erledigt sich, sobald jemand eingetragen ist; Knopf „Verantwortlichen
+eintragen“. Agenten finden und schlagen vor (mit Begründung), **eintragen tut ein Mensch**. Kein Schattenbetrieb: die
+Lücken zeigen sich als Signale und werden geschlossen.
+
+### Z8. Die Schleife kontrolliert sich selbst
+Je Template und Einheit: offen je Stufe, Zeit bis zur ersten Reaktion, Anteil lokal gelöst / weitergereicht / im LA,
+Ablehn- und Verwurf-Quote. Über einer Schwelle löst das ein Signal an den Agenten des Sets aus („Template X erzeugt vor
+allem Lärm“).
+
+### Z9. „Meine Signale“
+Eine Seite, drei Bereiche: **Bei mir** (ich bin der nächste Verantwortliche) · **Zu mir hochgekommen** (mit wer, wie
+lange, warum) · **Erledigt** (wodurch). Drei Knöpfe: **gesehen**, **gelöst (wodurch)**, **gehört nicht zu mir**.
+
+### Durchgerechnet
+**Projekt in FOOD.WORKS bis zum LA.** Regel trifft an Projekt P (Set an BHG.DIGITAL, vererbt) ⇒ nächster mit `manage`
+ist die Projektverantwortliche ⇒ Vorgang im Raum von P, Absender Ironhide ⇒ 3 Arbeitstage keine Reaktion ⇒ Venture
+Owner von FOOD.WORKS wird aufgenommen, Vorgang übergeben ⇒ er sieht: gemeinsame Ressource mit FOOD.ALCHEMIST betroffen
+(Faustregel) ⇒ Ironhide bereitet die vier Fragen vor ⇒ Entwurf im LA von FOOD.WORKS ⇒ LA beschließt Maßnahme ⇒ Kommentar
+im Vorgang, zurück an die Projektverantwortliche ⇒ umgesetzt, Vorgang geschlossen.
+
+**Wiederkehrende Quote.** „Erledigungsquote < 30 %“ an Container C, Zuordnung: Ziel *Linie*, wiederkehrend 3× in 30
+Tagen ⇒ Signal 1, gelöst („Aufgaben bereinigt“) ⇒ zwei Wochen später wieder unter 30 % ⇒ der alte Vorgang wird wieder
+geöffnet, „zum 2. Mal“ ⇒ beim 3. Mal geht er an den Nächsten darüber: die lokale Lösung hält nicht, das ist ein Muster.
+Ist die Ablehnquote des Templates hoch, meldet Z8 dem Agenten des Sets, dass die Regel überarbeitet werden muss.
+
+### Reihenfolge
+1. **Organisation:** Rang, Vertretung, Abfrage „verantwortlich“, Vertrag Verfügbarkeit.
+2. **Signals:** Vererbung „nächstes gewinnt“, Empfänger über `manage`, Eskalation (Z3), Zeitleiter raus,
+   „Einheit ohne Verantwortlichen“, „Meine Signale“, Kennzahlen der Schleife.
+3. **Parlan-Kanal:** ein Signal, ein Vorgang im Kontext-Raum.
+4. **People:** Abwesenheiten (parallel möglich – bis dahin gelten alle als anwesend).
+
 ## Verantwortung der Module
 
 | Modul | Rolle |
 |---|---|
-| **Organisation** | Knoten, Beziehungen (Verantwortliche), Kennzahlen. Keine Signal-Logik mehr. |
-| **Signals** | Sets, Templates, Beobachtungen, Signale mit Stufe und Ausgang, Lagebild, Gedächtnis, Vertrag `CommitteeGateway`. |
+| **Organisation** | Knoten, Beziehungen mit Fähigkeiten und Rang, Vertretung, Abfrage „verantwortlich“, Kennzahlen. Keine Signal-Logik mehr. |
+| **People** | Abwesenheiten (bindet den Vertrag Verfügbarkeit der Organisation). |
+| **Parlan-Adapter** | setzt `DeliveryChannel` um: ein Signal, ein Vorgang im Kontext-Raum. |
+| **Signals** | Sets (vererbt, nächstes gewinnt), Templates, Signale mit Stufe und Ausgang, Zustellung und Eskalation, Lagebild, Gedächtnis, Verträge `CommitteeGateway` und `DeliveryChannel`. |
 | **Management Book** | Gremien, Sitzungen, Agendapunkte nach den vier Fragen, Beschlüsse (inkl. `frame`), Ergebnis-Checks; setzt `CommitteeGateway` um. |
 | **Agenten** (MCP) | wahrnehmen, in die Hilfelogik übersetzen, lokal lösen im Rahmen, LA-Punkte vorbefüllen, Lagebild, umsetzen. |
 | **Menschen** | Bereich: 4a bestätigen, lokal führen. LA: entscheiden, Rahmen setzen, zurückgeben. Algedonic-Knopf. |
@@ -161,4 +284,4 @@ Anteil lokal gelöst, Anteil im LA, Ergebnis-Checks „handlungsfähiger“.
 
 ## Was vom heutigen Bau bleibt
 Sets an Knoten, verantwortlicher Agent, Templates (Regel/KI), Auswertung nur wo ein Set hängt, Auflösung mit Verweis,
-Gedächtnis, Umwelt, Arbeitsliste per MCP. Die Basis-Regeln laufen weiter; ihre Treffer gehen an die Einheit.
+Gedächtnis, Arbeitsliste per MCP. Die Basis-Regeln laufen weiter; ihre Treffer gehen an die Einheit.
