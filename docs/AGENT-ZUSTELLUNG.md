@@ -21,7 +21,8 @@ deinem Parlan-Zugang aus und meldest zurück. Fristen, Eskalation und Empfänger
 
 3. **Zurückmelden – immer, je Auftrag:** `signals.deliveries.POST {op_id, ok: true, thread}`.
    - Bei `create` ist `thread` Pflicht (ID des neuen Vorgangs). Darüber ordnet Signals die Reaktionen dem Signal zu.
-   - Hast du bei `reopen`/`handover` einen neuen Vorgang angelegt: neue `thread` mitgeben.
+   - Hast du bei `reopen`/`handover` einen neuen Vorgang angelegt: neue `thread` mitgeben. Signals merkt sich auch
+     den alten – eine späte Reaktion dort zählt noch.
    - Hat etwas nicht geklappt: `{op_id, ok: false, error: "…"}`. Der Auftrag kommt wieder; nach 5 Fehlversuchen gilt er
      als fehlgeschlagen, am Signal steht ein Systemkommentar (das Signal bleibt über die Seite erreichbar).
 4. Antwort von POST enthält `next_for_signal` – den nächsten Auftrag desselben Signals, falls einer wartet.
@@ -35,6 +36,8 @@ Bitte darum **nicht** selbst annehmen, erledigen oder ablehnen – das ist Sache
 
 ## Ton: Hilfe statt Macht
 
+- Raum und Mitglieder kommen aus dem Auftrag – nimm niemanden zusätzlich auf. Betrifft ein Signal eine Person
+  (z. B. Überlast), liegt der Vorgang bewusst im Raum der Einheit darüber, ohne diese Person.
 - Kurz. Ein Satz Anlass, dann die Frage. Keine Vorwürfe, keine Namen von „Schuldigen“, keine Drohung mit Eskalation.
 - Die drei Fragen tragen: *Was hindert euch? Was könnt ihr selbst lösen? Wobei braucht ihr Unterstützung?*
 - Ablehnen ist erwünscht, wenn es nicht passt – sag das freundlich („dann geht es an die richtige Stelle“).

@@ -14,6 +14,8 @@ use Platform\Signals\Models\Signal;
  *   erledigt   → gelöst, Notiz „In Parlan erledigt“ (+ Notiz aus dem Vorgang)
  *   abgelehnt  → „gehört nicht zu mir“, Begründung „In Parlan abgelehnt“ (+ Notiz) – eskaliert eine Stufe (Übergabe)
  *
+ * Zugeordnet über den aktuellen oder einen früheren Vorgang des Signals (neuer Vorgang beim Wiederöffnen).
+ *
  * Ignoriert: unbekannte Vorgänge, Reaktionen des Set-Agenten selbst (er führt den Vorgang nur), geschlossene
  * Signale und doppelte Ereignisse (event_id in signal_delivery_events, eindeutig).
  */
@@ -30,7 +32,7 @@ class DeliveryFeedbackService
             return 'ignored_kind';
         }
         $thread = trim($thread);
-        $signal = $thread !== '' ? Signal::query()->where('delivery_thread', $thread)->first() : null;
+        $signal = $thread !== '' ? $this->queue->signalForThread($thread) : null;
         if (! $signal) {
             return 'unknown_thread';
         }

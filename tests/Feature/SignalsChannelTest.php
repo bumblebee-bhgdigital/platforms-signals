@@ -377,6 +377,26 @@ class SignalsChannelTest extends TestCase
         $this->assertSame('anna@x.test', $reopen[0]->payload['to']);
         $this->assertTrue($this->report($reopen[0]->id, true, 'th-a1-neu')->success, 'neuer Vorgang, falls Parlan nicht wieder öffnen kann');
         $this->assertSame(['th-a1-neu', 'open'], [$signal->fresh()->delivery_thread, $signal->fresh()->delivery_state]);
+
+        // späte Reaktion im alten Vorgang zählt noch
+        $this->channel->emit('th-a1', 'accepted', $this->users['Anna']->id, null, 'e-late');
+        $this->assertSame('acknowledged', $signal->fresh()->status);
+    }
+
+    public function test_person_signal_goes_to_the_room_above_without_the_person(): void
+    {
+        $this->ids['dora'] = $this->person('Dora', $this->ids['a1']);
+        $this->snapshot($this->ids['dora'], ['items_open' => 80]);
+        $this->lookup->hold($this->ids['a1'], $this->ids['dora'], $this->users['Dora']->id, 'Dora', 'Mitarbeit');
+
+        $this->evaluate();
+        $signal = $this->at('dora');
+        $this->assertNotNull($signal);
+        $create = $this->ops($signal)[0];
+        $this->assertSame($this->ids['a1'], $create->payload['room']['id'], 'Raum der Einheit darüber, nicht der Raum der Person');
+        $this->assertSame($this->ids['a1'], (int) $signal->fresh()->delivery_room_entity_id);
+        $this->assertNotContains('dora@x.test', $create->payload['members']);
+        $this->assertContains('anna@x.test', $create->payload['members']);
     }
 
     public function test_feedback_by_the_agent_unknown_threads_and_duplicates_are_ignored(): void

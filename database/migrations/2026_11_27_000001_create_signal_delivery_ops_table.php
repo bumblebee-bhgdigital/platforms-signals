@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Schema;
  * - signals.delivery_state: null (kein Vorgang) | pending (Auftrag liegt beim Agenten) | open | closed
  * - signal_delivery_ops: Aufträge an den Agenten (create, handover, comment, reopen, close), der Reihe nach
  * - signal_delivery_events: bereits verarbeitete Rückmeldungen (event_id eindeutig – Doppelte werden ignoriert)
+ * - signal_delivery_threads: alle Vorgänge, die je zu einem Signal gehört haben (späte Reaktion im alten Vorgang zählt)
  * Idempotent (hasTable/hasColumn-Guards).
  */
 return new class extends Migration
@@ -57,10 +58,20 @@ return new class extends Migration
                 $t->timestamps();
             });
         }
+
+        if (! Schema::hasTable('signal_delivery_threads')) {
+            Schema::create('signal_delivery_threads', function (Blueprint $t) {
+                $t->id();
+                $t->string('thread', 191)->unique();
+                $t->unsignedBigInteger('signal_id')->index();
+                $t->timestamps();
+            });
+        }
     }
 
     public function down(): void
     {
+        Schema::dropIfExists('signal_delivery_threads');
         Schema::dropIfExists('signal_delivery_events');
         Schema::dropIfExists('signal_delivery_ops');
         foreach (['delivery_thread', 'delivery_room_entity_id', 'delivery_state'] as $name) {

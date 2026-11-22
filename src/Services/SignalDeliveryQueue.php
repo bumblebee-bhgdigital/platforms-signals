@@ -176,7 +176,7 @@ class SignalDeliveryQueue
     {
         $signal->forceFill([
             'delivery_state' => 'pending',
-            'delivery_room_entity_id' => $signal->delivery_room_entity_id ?: $signal->entity_id,
+            'delivery_room_entity_id' => $signal->delivery_room_entity_id ?: $this->roomEntityId($signal),
         ])->saveQuietly();
 
         return SignalDeliveryOp::create(['signal_id' => $signal->id, 'op' => 'create', 'payload' => $payload]);
@@ -226,7 +226,7 @@ class SignalDeliveryQueue
         return [
             'title' => mb_strimwidth("Signal: {$what} in {$entity}", 0, 120, '…'),
             'markdown' => implode("\n", $lines),
-            'room' => ['object' => 'entity', 'id' => (int) ($signal->delivery_room_entity_id ?: $signal->entity_id)],
+            'room' => ['object' => 'entity', 'id' => (int) ($signal->delivery_room_entity_id ?: $this->roomEntityId($signal))],
             'members' => $this->memberEmails($signal),
             'assignee' => $this->assigneeEmail($signal),
             'severity' => $signal->severity,
@@ -234,10 +234,57 @@ class SignalDeliveryQueue
         ];
     }
 
-    /** Empfänger (inkl. Mensch eines Agenten bei kritisch/Eskalation – steckt schon in recipient_user_ids). @return string[] */
+    /**
+     * Raum des Vorgangs: der Kontext-Raum des Knotens. Betrifft das Signal eine Person oder einen Agenten (Knoten mit
+     * verknüpftem Nutzer, z. B. Überlast), nicht deren eigener Raum, sondern der des Verantwortlichen darüber –
+     * der Betroffene liest nicht mit.
+     */
+    public function roomEntityId(Signal $signal): ?int
+    {
+        $entityId = $signal->entity_id ? (int) $signal->entity_id : null;
+        if ($entityId && $signal->recipient_node_entity_id && $this->affectedUserId($signal)) {
+            return (int) $signal->recipient_node_entity_id;
+        }
+
+        return $entityId;
+    }
+
+    /** Nutzer, den das Signal selbst betrifft (Knoten = Person/Agent), sonst null. */
+    public function affectedUserId(Signal $signal): ?int
+    {
+        if (! $signal->entity_id) {
+            return null;
+        }
+        $id = OrganizationEntity::whereKey($signal->entity_id)->value('linked_user_id');
+
+        return $id ? (int) $id : null;
+    }
+
+    /** Merkt sich jeden Vorgang des Signals – eine späte Reaktion im alten Vorgang wird noch zugeordnet. */
+    public function rememberThread(Signal $signal, string $thread): void
+    {
+        DB::table('signal_delivery_threads')->insertOrIgnore([
+            'thread' => mb_substr($thread, 0, 191), 'signal_id' => $signal->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
+    /** Signal zu einem Vorgang – aktueller oder früherer. */
+    public function signalForThread(string $thread): ?Signal
+    {
+        $signal = Signal::query()->where('delivery_thread', $thread)->first();
+        if ($signal) {
+            return $signal;
+        }
+        $id = DB::table('signal_delivery_threads')->where('thread', $thread)->value('signal_id');
+
+        return $id ? Signal::find($id) : null;
+    }
+
+    /** Empfänger (inkl. Mensch eines Agenten bei kritisch/Eskalation – steckt schon in recipient_user_ids), nie der Betroffene. @return string[] */
     public function memberEmails(Signal $signal): array
     {
         $ids = array_values(array_unique(array_map('intval', (array) $signal->recipient_user_ids)));
+        $ids = array_values(array_diff($ids, array_filter([$this->affectedUserId($signal)])));
 
         return $ids === [] ? [] : User::whereIn('id', $ids)->whereNotNull('email')->pluck('email')->unique()->values()->all();
     }
@@ -290,7 +337,7 @@ class SignalDeliveryQueue
             $s = $o->signal;
             $waits = $first[$o->signal_id] ?? null;
             $first[$o->signal_id] ??= $o->id;
-            $room = (int) ($s->delivery_room_entity_id ?: $s->entity_id);
+            $room = (int) ($s->delivery_room_entity_id ?: $this->roomEntityId($s));
 
             return [
                 'op_id' => $o->id,
@@ -334,6 +381,9 @@ class SignalDeliveryQueue
                 throw new SignalSetException('thread ist beim Anlegen Pflicht: die ID des neuen Parlan-Vorgangs.', 'VALIDATION_ERROR');
             }
             $op->forceFill(['status' => 'done', 'done_at' => now(), 'last_error' => null])->save();
+            if ($thread) {
+                $this->rememberThread($signal, $thread);
+            }
             $fields = $thread ? ['delivery_thread' => $thread] : [];
             $fields['delivery_state'] = match ($op->op) {
                 'create', 'reopen' => 'open',
