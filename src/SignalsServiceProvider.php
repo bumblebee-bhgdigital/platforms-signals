@@ -56,6 +56,12 @@ class SignalsServiceProvider extends ServiceProvider
          * WICHTIG: Muss in register() sein, nicht in boot()!
          */
         $this->mergeConfigFrom(__DIR__.'/../config/signals.php', 'signals');
+
+        // Zuständigkeit (Z2/Z6): Frage an die Organisation über einen schmalen Vertrag. Ohne deren Abfrage
+        // ist niemand verantwortlich – Signals läuft dann über die Seite weiter.
+        $this->app->singleton(\Platform\Signals\Contracts\ResponsibilityLookup::class, fn () => \Platform\Signals\Organization\OrganizationResponsibilityLookup::available()
+            ? new \Platform\Signals\Organization\OrganizationResponsibilityLookup()
+            : new \Platform\Signals\Support\NullResponsibilityLookup());
         
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -214,7 +220,8 @@ class SignalsServiceProvider extends ServiceProvider
     }
 
     /**
-     * Auswertung nach dem Snapshot der Organisation (08:00 / 18:00), Eskalation stündlich.
+     * Auswertung nach dem Snapshot der Organisation (08:00 / 18:00), Eskalation stündlich (Z3: ignoriert,
+     * dauerhaft, wiederkehrend – Fristen rechnet der Zeitplan von Signals, nicht der Agent).
      * Der Takt je Template (every_snapshot | daily | weekly) entscheidet, was jeweils dran ist.
      */
     protected function registerSchedule(): void
@@ -301,7 +308,7 @@ class SignalsServiceProvider extends ServiceProvider
         );
     }
 
-    /** MCP-Tools: signal_sets, templates, set_templates, signals, evaluate, inference, memory, committee_items. */
+    /** MCP-Tools: signal_sets, templates, set_templates, signals, evaluate, inference, memory, committee_items, mine. */
     protected function registerTools(): void
     {
         try {
@@ -327,6 +334,7 @@ class SignalsServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Signals\Tools\DeleteMemoryTool());
             $registry->register(new \Platform\Signals\Tools\CreateCommitteeItemTool());
             $registry->register(new \Platform\Signals\Tools\GetCommitteeSituationTool());
+            $registry->register(new \Platform\Signals\Tools\GetMySignalsTool());
         } catch (\Throwable $e) {
             // ToolRegistry nicht verfügbar
         }

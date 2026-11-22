@@ -25,7 +25,12 @@ class UpsertSetTemplateTool implements ToolContract, ToolMetadataContract
     {
         return 'PUT /signals/sets/{set}/templates/{template} - Legt ein Template in ein Signal-Set oder ändert die Zuordnung. Pflicht: signal_set_id, signal_template_id. '
             . 'Overrides je Set: conditions_override (Objekt, wird über die conditions des Templates gelegt, z. B. {"value": 30}), severity_override, frequency_override, schedule_interval_hours_override; '
-            . 'null setzt einen Override zurück. is_active=false pausiert das Template nur in diesem Set. remove=true nimmt es aus dem Set.';
+            . 'null setzt einen Override zurück. is_active=false pausiert das Template nur in diesem Set. remove=true nimmt es aus dem Set. '
+            . 'Vererbung „das nächste gewinnt“: pro Knoten und Template gilt die nächste Zuordnung im Baum (Set am Knoten, sonst an einem Vorfahren mit inherit_down). '
+            . 'opts_out=true wählt das Template in diesem Set ab („gilt bei uns nicht“); is_binding=true macht eine Zuordnung verbindlich (unten anpassbar, nicht abwählbar). '
+            . 'Politik der Zuordnung (null = Standard): reaction_days (Arbeitstage bis „ignoriert“, Standard 3), recurrence_count + recurrence_window_days (wiederkehrend N× in X Tagen, Standard 3 in 30), '
+            . 'persistence_days (angenommen, aber zu lange offen, Standard 14), escalation_target none|line|committee (Standard line), delivery overview|task (Standard overview, bei critical/algedonic task), '
+            . 'recipient_capability (Fähigkeit des Empfängers, Standard manage).';
     }
 
     public function getSchema(): array
@@ -42,6 +47,15 @@ class UpsertSetTemplateTool implements ToolContract, ToolMetadataContract
                 'is_active' => ['type' => 'boolean'],
                 'position' => ['type' => 'integer'],
                 'remove' => ['type' => 'boolean', 'description' => 'true = Template aus dem Set nehmen.'],
+                'is_binding' => ['type' => 'boolean', 'description' => 'Verbindlich: weiter unten anpassbar, nicht abwählbar.'],
+                'opts_out' => ['type' => 'boolean', 'description' => 'Abwahl: das Template gilt an den Knoten dieses Sets nicht.'],
+                'reaction_days' => ['type' => ['integer', 'null'], 'description' => 'Arbeitstage bis „ignoriert“.'],
+                'recurrence_count' => ['type' => ['integer', 'null']],
+                'recurrence_window_days' => ['type' => ['integer', 'null']],
+                'persistence_days' => ['type' => ['integer', 'null']],
+                'escalation_target' => ['type' => ['string', 'null'], 'enum' => ['none', 'line', 'committee', null]],
+                'delivery' => ['type' => ['string', 'null'], 'enum' => ['overview', 'task', null]],
+                'recipient_capability' => ['type' => ['string', 'null']],
                 'team_id' => ['type' => 'integer'],
             ],
             'required' => ['signal_set_id', 'signal_template_id'],
@@ -76,6 +90,8 @@ class UpsertSetTemplateTool implements ToolContract, ToolMetadataContract
 
             $assignment = $service->attach($set, $template, array_intersect_key($arguments, array_flip([
                 'conditions_override', 'severity_override', 'frequency_override', 'schedule_interval_hours_override', 'is_active', 'position',
+                'is_binding', 'opts_out', 'reaction_days', 'recurrence_count', 'recurrence_window_days', 'persistence_days',
+                'escalation_target', 'delivery', 'recipient_capability',
             ])));
 
             return ToolResult::success([

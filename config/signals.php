@@ -33,18 +33,27 @@ return [
     'guard' => 'web',
 
     /*
-     * Wie lange darf ein Signal auf einer VSM-Ebene offen liegen, bevor die Eskalation es eine Stufe
-     * höher zieht (Stunden). Algedonic: Schmerz-Kanal nach Beer, extrem kurz.
+     * Frist des Algedonic-Kanals (Stunden, Beer: Schmerz-Kanal, extrem kurz). Die alte VSM-Zeitleiter
+     * (Frist je Ebene ⇒ Ebene und Schweregrad hoch) entfällt mit Z3 – Eskalation siehe 'delivery'.
      */
     'deadlines' => [
-        'default' => 168,
-        's1' => 24,
-        's2' => 48,
-        's3' => 72,
-        's3_star' => 72,
-        's4' => 168,
-        's5' => 336,
         'algedonic' => 1,
+    ],
+
+    /*
+     * Zustellung und Eskalation (Architektur Z1–Z4): Standards, wenn die gewinnende Zuordnung im Set nichts
+     * eigenes setzt. Reaktionszeit in Arbeitstagen (Mo–Fr), übrige Fristen in Kalendertagen.
+     */
+    'delivery' => [
+        'reaction_days' => (int) env('SIGNALS_REACTION_DAYS', 3),
+        'recurrence_count' => 3,
+        'recurrence_window_days' => 30,
+        'persistence_days' => 14,
+        'escalation_target' => 'line', // none | line | committee
+        'delivery' => 'overview', // overview | task
+        'task_severities' => ['critical', 'algedonic'], // Zustellung als Vorgang, wenn die Zuordnung nichts setzt
+        'recipient_capability' => 'manage',
+        'no_responsible_severity' => 'critical', // Standard-Schweregrad für „Einheit ohne Verantwortlichen“
     ],
 
     /**
@@ -85,6 +94,11 @@ return [
         [
             'group' => 'Signal-Sets',
             'items' => [
+                [
+                    'label' => 'Meine Signale',
+                    'route' => 'signals.mine',
+                    'icon'  => 'heroicon-o-inbox',
+                ],
                 [
                     'label' => 'Übersicht',
                     'route' => 'signals.dashboard',

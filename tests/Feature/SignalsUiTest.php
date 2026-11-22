@@ -67,8 +67,10 @@ class SignalsUiTest extends TestCase
         $show = new \Platform\Signals\Livewire\Show();
         $show->mount($this->set);
         $show->runDryRun();
-        $this->assertSame(1, $show->dryRun['created']);
+        // Z4: dieselbe Sache kurz nach dem Lösen = das alte Signal würde wieder geöffnet, kein neues
+        $this->assertSame([0, 1], [$show->dryRun['created'], $show->dryRun['reopened']]);
         $this->assertSame(1, Signal::count(), 'Probelauf schreibt nichts');
+        $this->assertSame('resolved', $signal->fresh()->status);
     }
 
     public function test_template_form_creates_rule_and_rejects_broken_json(): void

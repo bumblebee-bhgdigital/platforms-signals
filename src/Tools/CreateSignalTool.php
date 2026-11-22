@@ -103,10 +103,10 @@ class CreateSignalTool implements ToolContract, ToolMetadataContract
                 $data['created_by_agent_entity_id'] = \Platform\Signals\Support\Agents::entityId($context->user);
             }
 
-            // Ein offenes Signal je Template/Set/Knoten: aktualisieren statt duplizieren
+            // Ein offenes Signal je Team/Knoten/Template (Z1, egal aus welchem Set): aktualisieren statt duplizieren
             if ($template && empty($arguments['legacy_organization_signal_id'])) {
                 $open = Signal::query()->where('team_id', $team->id)
-                    ->where('signal_template_id', $template->id)->where('signal_set_id', $set?->id)
+                    ->where('signal_template_id', $template->id)
                     ->where('entity_id', (int) $arguments['entity_id'])->whereIn('status', ['open', 'acknowledged'])->first();
                 if ($open) {
                     $rank = array_flip(Signal::SEVERITIES);

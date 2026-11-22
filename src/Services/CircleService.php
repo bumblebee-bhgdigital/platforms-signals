@@ -103,6 +103,36 @@ class CircleService
         return null;
     }
 
+    /** Eigenes Gremium eines Trägers (nicht stellvertretend von oben) oder null. */
+    public function ownCommittee(int $carrierEntityId): ?array
+    {
+        $c = $this->committeesByCarrier()[$carrierEntityId] ?? null;
+
+        return $c ? $this->describe($c) : null;
+    }
+
+    /** Ist der Knoten selbst ein Träger (Spitze einer Einheit)? */
+    public function isCarrier(int $entityId): bool
+    {
+        return $this->carrierOf($entityId) === $entityId;
+    }
+
+    /**
+     * Z3/Z5: Eskalation aus der Linie an ein Gremium übergeben. Nutzt denselben Weg wie die Eskalation im LA:
+     * Stufe „escalated“ mit committee_entity_id – das Signal erscheint in der Lage des Gremiums unter
+     * „an ihn eskaliert“, der Steward hebt es mit den vier Fragen in die nächste Sitzung (liftToCommittee).
+     */
+    public function handToCommittee(Signal $signal, array $committee): Signal
+    {
+        $signal->forceFill([
+            'stage' => 'escalated',
+            'committee_entity_id' => (int) $committee['entity_id'],
+            'meeting_ref_id' => null, 'due_at' => null, 'agenda_ref_type' => null, 'agenda_ref_id' => null,
+        ])->save();
+
+        return $signal;
+    }
+
     public function committeeInfo(int $committeeEntityId): ?array
     {
         $c = collect($this->committeesByCarrier())->firstWhere('entity_id', $committeeEntityId);

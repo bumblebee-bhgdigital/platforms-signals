@@ -26,7 +26,8 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <x-nx-badge :variant="$P::severityVariant($s->severity)">{{ $P::SEVERITY_LABELS[$s->severity] ?? $s->severity }}</x-nx-badge>
                     @if($s->vsm_level)<x-nx-badge variant="neutral">{{ strtoupper($s->vsm_level) }}</x-nx-badge>@endif
-                    @if($s->escalated_at)<x-nx-badge variant="warning">eskaliert {{ $s->escalated_at->diffForHumans() }}</x-nx-badge>@endif
+                    @if($s->escalated_at)<x-nx-badge variant="warning">eskaliert {{ $s->escalated_at->diffForHumans() }}@if($s->escalation_level) · Stufe {{ $s->escalation_level }}@endif</x-nx-badge>@endif
+                    @if((int) $s->recurrence_count > 1)<x-nx-badge variant="warning">{{ $s->recurrence_count }}. Mal</x-nx-badge>@endif
                     @if($s->snooze_until && $s->snooze_until->isFuture())<x-nx-badge variant="neutral">zurückgestellt bis {{ $s->snooze_until->format('d.m.Y') }}</x-nx-badge>@endif
                 </div>
                 <h1 class="mt-2 mb-0 text-lg font-semibold text-[color:var(--nx-text)] whitespace-pre-line">{{ $s->message }}</h1>
@@ -49,7 +50,12 @@
                 @else manuell @endif
                 @if($s->createdByAgent)<span class="text-xs text-[color:var(--nx-muted)]"> · von {{ $s->createdByAgent->name }}</span>@endif
             </x-nx-property-row>
-            <x-nx-property-row icon="heroicon-o-cpu-chip" label="Zuständig">
+            <x-nx-property-row icon="heroicon-o-user" label="Bei">
+                {{ $recipients }}
+                @if($s->recipient_reason)<div class="text-xs text-[color:var(--nx-muted)]">{{ $s->recipient_reason }}@if($w = $P::waiting($s->delivered_at)) · {{ $w }}@endif</div>@endif
+                @if($s->escalation_reason)<div class="text-xs">Eskalation: {{ $s->escalation_reason }}</div>@endif
+            </x-nx-property-row>
+            <x-nx-property-row icon="heroicon-o-cpu-chip" label="Begleitet von">
                 {{ $s->responsible?->name ?? '–' }}
                 @if($s->assignee) · zugewiesen an {{ $s->assignee->name }}@endif
                 @if($s->currentOwner) · Owner {{ $s->currentOwner->name }}@endif
@@ -121,6 +127,10 @@
                             <x-nx-input-select name="linkType" label="Verweis (optional)" wire:model="linkType" nullable="true" nullLabel="kein Verweis" :options="$linkTypes" />
                             <x-nx-input-text name="linkId" label="ID" wire:model="linkId" />
                             <div class="flex items-end"><x-nx-button variant="primary" size="sm" wire:click="resolve">Erledigt</x-nx-button></div>
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <div class="grow"><x-nx-input-text name="rejectReason" label="Gehört nicht zu mir – warum?" wire:model="rejectReason" /></div>
+                            <x-nx-button variant="ghost" size="sm" wire:click="reject">Gehört nicht zu mir</x-nx-button>
                         </div>
                         <div class="flex items-end gap-2">
                             <div class="grow"><x-nx-input-text name="reason" label="Verwerfen – warum?" wire:model="reason" /></div>

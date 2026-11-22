@@ -12,6 +12,9 @@
  * 
  * BEISPIEL:
  * Route::get('/', Dashboard::class)->name('signals.dashboard');
+
+// Z9 „Meine Signale“: was bei mir liegt, was zu mir hochkam, was erledigt ist
+Route::get('/mine', Mine::class)->name('signals.mine');
  * 
  * Wird zu: /signals/ (wenn prefix = 'signals')
  * 
@@ -19,6 +22,7 @@
  */
 
 use Platform\Signals\Livewire\Dashboard;
+use Platform\Signals\Livewire\Mine;
 use Platform\Signals\Livewire\Show;
 use Platform\Signals\Livewire\Showcase;
 use Platform\Signals\Livewire\Signal\Index as SignalIndex;
@@ -32,6 +36,9 @@ use Platform\Signals\Livewire\Circle\Index as CircleIndex;
  * Hauptübersicht des Moduls
  */
 Route::get('/', Dashboard::class)->name('signals.dashboard');
+
+// Z9 „Meine Signale“: was bei mir liegt, was zu mir hochkam, was erledigt ist
+Route::get('/mine', Mine::class)->name('signals.mine');
 
 // Übersicht aller Sets (Alias auf dieselbe Komponente) und Detailseite.
 // {signalSet} = Route-Model-Binding auf die ID (wie {plannerProject} im Planner).

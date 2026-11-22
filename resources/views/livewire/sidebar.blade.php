@@ -20,6 +20,11 @@
 
     <div class="mt-2" x-show="!collapsed">
         <x-ui-sidebar-list label="Arbeiten">
+            <x-ui-sidebar-item :href="route('signals.mine')">
+                @svg('heroicon-o-inbox', 'w-4 h-4 text-[var(--nx-text)]')
+                <span class="ml-2 text-sm">Meine Signale</span>
+                @if(($mySignals ?? 0) > 0)<span class="ml-auto text-xs text-[var(--nx-muted)]">{{ $mySignals }}</span>@endif
+            </x-ui-sidebar-item>
             <x-ui-sidebar-item :href="route('signals.circle.index')">
                 @svg('heroicon-o-arrow-path', 'w-4 h-4 text-[var(--nx-text)]')
                 <span class="ml-2 text-sm">Regelkreis</span>

@@ -8,7 +8,7 @@ use Platform\Signals\Livewire\Concerns\ResolvesTeamFamily;
 use Platform\Signals\Models\Signal;
 use Platform\Signals\Services\SignalService;
 
-/** Detailseite eines Signals: bestätigen, erledigen (Notiz + Verweis), verwerfen, zurückstellen, Maßnahmen, Kommentare. */
+/** Detailseite eines Signals: bestätigen, erledigen (Notiz + Verweis), verwerfen, „gehört nicht zu mir“, zurückstellen, Maßnahmen, Kommentare. */
 class Show extends Component
 {
     use ResolvesTeamFamily;
@@ -19,6 +19,7 @@ class Show extends Component
     public string $linkType = '';
     public string $linkId = '';
     public string $reason = '';
+    public string $rejectReason = '';
     public string $comment = '';
     public string $snoozeDays = '7';
     public ?string $error = null;
@@ -70,6 +71,15 @@ class Show extends Component
         });
     }
 
+    /** „Gehört nicht zu mir“ (Begründung Pflicht) – eskaliert sofort eine Stufe. */
+    public function reject(): void
+    {
+        $this->attempt(function () {
+            $this->service()->transition($this->signal, 'reject', auth()->user(), ['reason' => $this->rejectReason]);
+            $this->reset('rejectReason');
+        });
+    }
+
     public function reopen(): void
     {
         $this->attempt(fn () => $this->service()->transition($this->signal, 'reopen', auth()->user()));
@@ -106,7 +116,7 @@ class Show extends Component
 
     public function render()
     {
-        $s = $this->signal->load(['entity:id,name', 'set:id,title', 'template', 'responsible:id,name', 'resolvedBy:id,name', 'actions', 'assignee:id,name', 'currentOwner:id,name', 'perspectiveEntity:id,name', 'createdByAgent:id,name']);
+        $s = $this->signal->load(['entity:id,name', 'set:id,title', 'template', 'responsible:id,name', 'resolvedBy:id,name', 'actions', 'assignee:id,name', 'currentOwner:id,name', 'perspectiveEntity:id,name', 'createdByAgent:id,name', 'recipientNode:id,name']);
         $link = null;
         if ($s->resolution_link_type) {
             try {
@@ -123,6 +133,7 @@ class Show extends Component
             'comments' => $s->comments()->with('user:id,name')->orderBy('created_at')->get(),
             'focused' => $s->isFocusedBy(auth()->user()),
             'linkTypes' => \Platform\Signals\Services\SignalService::linkTypes(),
+            'recipients' => app(\Platform\Signals\Services\SignalDelivery::class)->recipientNames($s),
         ])->layout('platform::layouts.app');
     }
 }

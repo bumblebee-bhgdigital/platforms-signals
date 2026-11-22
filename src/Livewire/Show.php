@@ -172,6 +172,7 @@ class Show extends Component
         $this->dryRun = [
             'created' => $report['created'],
             'resolved' => $report['resolved'],
+            'reopened' => $report['reopened'] ?? 0,
             'nodes' => count(app(\Platform\Signals\Services\SignalEvaluationService::class)->scopeEntityIds($this->signalSet)),
             'rows' => collect($report['results'])->map(fn ($r) => [
                 'template' => $r['template'] ?? ('#' . ($r['template_id'] ?? '?')),

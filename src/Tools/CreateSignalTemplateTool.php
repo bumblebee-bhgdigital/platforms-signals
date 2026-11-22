@@ -26,7 +26,8 @@ class CreateSignalTemplateTool implements ToolContract, ToolMetadataContract
         return 'POST /signals/templates - Legt ein Signal-Template an. Pflicht: name, kind (rule | inference, Default rule). '
             . 'rule: pattern_type + conditions. threshold {metric, operator, value}; trend {metric, direction increasing|decreasing, periods, min_change_percent}; '
             . 'ratio {numerator, denominator, operator, value, min_denominator?, grace_days?}; cross_dimension {metric_a, metric_b, relationship diverging|converging}. '
-            . 'Für alle Muster optional: entity_types bzw. exclude_entity_types (Liste von Knotentyp-Codes, z. B. ["container","board"]). '
+            . 'no_responsible {capability?: manage} = „Einheit ohne Verantwortlichen“: jede Einheit (VSM-Klasse carrier) im Geltungsbereich, an der niemand die Fähigkeit hält (Standard-Schweregrad critical; Empfänger ist der Verantwortliche darüber; erledigt sich, sobald jemand eingetragen ist). '
+            . 'Wo eine Regel nicht gelten soll: im Set weiter unten abwählen (signals.set_templates.PUT opts_out=true) – Knotentyp-Filter gibt es nicht mehr. '
             . 'Kennzahlen sind die Metriken der Knoten-Snapshots (z. B. items_open, items_done, items_total, time_total_minutes, planner_items_overdue, mb_*). frequency: every_snapshot | daily | weekly. '
             . 'inference: prompt, vsm_system (s1–s5, s3_star), dimension, schedule_interval_hours. '
             . 'Optional signal_set_id: Template direkt in dieses Set legen.';

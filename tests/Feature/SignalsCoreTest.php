@@ -227,22 +227,17 @@ class SignalsCoreTest extends TestCase
         $this->assertSame('Basis', $r->data['template']['sets'][0]['signal_set']);
         $this->assertSame(50, $r->data['template']['sets'][0]['effective']['conditions']['value']);
     }
-    public function test_overdue_signals_escalate_up_the_vsm_ladder(): void
+    /** Z3: die alte Zeitleiter (Frist ⇒ VSM-Ebene und Schweregrad hoch) gibt es nicht mehr. */
+    public function test_old_vsm_ladder_no_longer_escalates(): void
     {
         $signal = Signal::create([
             'team_id' => $this->s['teamId'], 'entity_id' => $this->ids['a'], 'message' => 'überfällig', 'severity' => 'warning',
             'status' => 'open', 'vsm_level' => 's3', 'deadline_at' => now()->subHour(),
         ]);
         $r = app(\Platform\Signals\Services\SignalEscalationService::class)->run();
-        $this->assertSame(1, $r['escalated']);
+        $this->assertSame(0, $r['escalated']);
         $signal->refresh();
-        $this->assertSame('s3_star', $signal->vsm_level);
-        $this->assertSame('critical', $signal->severity);
-        $this->assertTrue($signal->deadline_at->isFuture());
-
-        // bestätigt = keine Eskalation mehr
-        $signal->update(['deadline_at' => now()->subHour(), 'acknowledged_at' => now()]);
-        $this->assertSame(0, app(\Platform\Signals\Services\SignalEscalationService::class)->run()['escalated']);
+        $this->assertSame(['s3', 'warning', null], [$signal->vsm_level, $signal->severity, $signal->escalated_at]);
     }
     public function test_new_responsible_agent_takes_over_open_signals(): void
     {
@@ -254,15 +249,12 @@ class SignalsCoreTest extends TestCase
         app(\Platform\Signals\Services\SignalSetService::class)->update($this->set->fresh(), ['responsible_agent_user_id' => $this->s['agent']->id]);
         $this->assertTrue(Signal::all()->every(fn ($s) => $s->responsible_user_id === $this->s['agent']->id));
     }
-    public function test_entity_type_filter_limits_where_a_rule_fires(): void
+    /** Z1: der Typ-Filter entfällt (Abwahl ersetzt ihn) – alte Schlüssel in den Bedingungen werden still ignoriert. */
+    public function test_entity_type_condition_keys_are_ignored(): void
     {
         $templateId = $this->ruleTemplate();
-        $this->tool(UpsertSetTemplateTool::class, ['signal_set_id' => $this->set->id, 'signal_template_id' => $templateId, 'conditions_override' => ['exclude_entity_types' => ['business_unit']]]);
+        $this->tool(UpsertSetTemplateTool::class, ['signal_set_id' => $this->set->id, 'signal_template_id' => $templateId, 'conditions_override' => ['exclude_entity_types' => ['t_any'], 'entity_types' => ['t_other']]]);
         app(SignalEvaluationService::class)->run();
-        $this->assertSame(0, Signal::count(), 'alle Knoten im Test sind business_unit');
-
-        $this->tool(UpsertSetTemplateTool::class, ['signal_set_id' => $this->set->id, 'signal_template_id' => $templateId, 'conditions_override' => ['entity_types' => ['business_unit']]]);
-        app(SignalEvaluationService::class)->run(null, true);
         $this->assertSame(2, Signal::count());
     }
 }

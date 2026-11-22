@@ -54,7 +54,7 @@
                                 <x-nx-table-row wire:key="s-{{ $signal->id }}" :href="route('signals.signals.show', $signal)">
                                     <x-nx-table-cell>
                                         <x-nx-badge :variant="$P::severityVariant($signal->severity)">{{ $P::SEVERITY_LABELS[$signal->severity] ?? $signal->severity }}</x-nx-badge>
-                                        @if($signal->escalated_at)<x-nx-badge variant="warning">eskaliert {{ strtoupper((string) $signal->vsm_level) }}</x-nx-badge>@endif
+                                        @if($signal->escalated_at)<x-nx-badge variant="warning">eskaliert{{ $signal->escalation_level ? ' · Stufe ' . $signal->escalation_level : '' }}</x-nx-badge>@endif
                                         <span class="text-sm">{{ \Illuminate\Support\Str::limit($signal->message, 120) }}</span>
                                     </x-nx-table-cell>
                                     <x-nx-table-cell>{{ $signal->entity?->name ?? '#' . $signal->entity_id }}</x-nx-table-cell>

@@ -20,7 +20,7 @@ class SignalTemplate extends Model
     public const KIND_INFERENCE = 'inference';
     public const KINDS = [self::KIND_RULE, self::KIND_INFERENCE];
 
-    public const PATTERN_TYPES = ['threshold', 'trend', 'ratio', 'cross_dimension'];
+    public const PATTERN_TYPES = ['threshold', 'trend', 'ratio', 'cross_dimension', 'no_responsible'];
     public const SEVERITIES = ['info', 'warning', 'critical', 'algedonic'];
     public const FREQUENCIES = ['every_snapshot', 'daily', 'weekly'];
     public const VSM_SYSTEMS = ['s1', 's2', 's3', 's3_star', 's4', 's5'];

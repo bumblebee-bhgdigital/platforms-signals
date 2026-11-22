@@ -26,11 +26,16 @@ class SignalTemplateService
         'trend' => ['metric'],
         'ratio' => ['numerator', 'denominator', 'value'],
         'cross_dimension' => ['metric_a', 'metric_b'],
+        'no_responsible' => [],
     ];
 
     public function create(User $by, int $teamId, array $data): SignalTemplate
     {
         $fields = $this->validated(array_merge(['kind' => SignalTemplate::KIND_RULE], $data), null);
+        // „Einheit ohne Verantwortlichen“ (Z7) ist standardmäßig hoch eingestuft
+        if (($fields['pattern_type'] ?? null) === 'no_responsible' && empty($fields['severity'])) {
+            $fields['severity'] = (string) config('signals.delivery.no_responsible_severity', 'critical');
+        }
 
         return SignalTemplate::create(array_merge($fields, ['team_id' => $teamId, 'created_by_user_id' => $by->id]));
     }
@@ -75,10 +80,29 @@ class SignalTemplateService
             $h = $overrides['schedule_interval_hours_override'];
             $values['schedule_interval_hours_override'] = $h ? max(1, (int) $h) : null;
         }
-        foreach (['is_active' => 'bool', 'position' => 'int'] as $key => $cast) {
+        foreach (['is_active' => 'bool', 'position' => 'int', 'is_binding' => 'bool', 'opts_out' => 'bool'] as $key => $cast) {
             if (array_key_exists($key, $overrides)) {
                 $values[$key] = $cast === 'bool' ? (bool) $overrides[$key] : (int) $overrides[$key];
             }
+        }
+        // Politik der Zuordnung (Z3/Z4); null = Standard aus config signals.delivery
+        foreach (['reaction_days', 'recurrence_count', 'recurrence_window_days', 'persistence_days'] as $key) {
+            if (array_key_exists($key, $overrides)) {
+                $v = $overrides[$key];
+                $values[$key] = ($v === null || $v === '') ? null : max($key === 'recurrence_count' ? 2 : 1, (int) $v);
+            }
+        }
+        foreach (['escalation_target' => SignalSetTemplate::ESCALATION_TARGETS, 'delivery' => SignalSetTemplate::DELIVERIES] as $key => $allowed) {
+            if (array_key_exists($key, $overrides)) {
+                $v = $overrides[$key] ?: null;
+                if ($v !== null && ! in_array($v, $allowed, true)) {
+                    throw new SignalSetException("{$key} muss " . implode(', ', $allowed) . ' sein.');
+                }
+                $values[$key] = $v;
+            }
+        }
+        if (array_key_exists('recipient_capability', $overrides)) {
+            $values['recipient_capability'] = trim((string) $overrides['recipient_capability']) ?: null;
         }
 
         return DB::transaction(fn () => SignalSetTemplate::query()->updateOrCreate(
@@ -127,7 +151,7 @@ class SignalTemplateService
         if ($kind === SignalTemplate::KIND_RULE) {
             $pattern = $out['pattern_type'] ?? $existing?->pattern_type;
             if (! in_array($pattern, SignalTemplate::PATTERN_TYPES, true)) {
-                throw new SignalSetException('pattern_type muss threshold, trend, ratio oder cross_dimension sein.');
+                throw new SignalSetException('pattern_type muss threshold, trend, ratio, cross_dimension oder no_responsible sein.');
             }
             $conditions = $out['conditions'] ?? $existing?->conditions;
             if (! is_array($conditions)) {

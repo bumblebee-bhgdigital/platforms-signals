@@ -209,3 +209,50 @@ class FakeCommitteeGateway implements \Platform\Signals\Contracts\CommitteeGatew
     }
 }
 
+
+/**
+ * Test-Double der Zuständigkeits-Abfrage (Vertrag ResponsibilityLookup): Signals wird nie gegen die Organisation
+ * selbst getestet. Verantwortliche je Knoten setzt der Test mit hold(); responsibleFor() sucht wie die Organisation
+ * vom Knoten aufwärts (Struktur über parent_entity_id), bis jemand gefunden ist, und überspringt Ausgeschlossene.
+ */
+require_once getenv('SIGNALS_MODULE_PATH') . '/src/Contracts/ResponsibilityLookup.php';
+
+class FakeResponsibilityLookup implements \Platform\Signals\Contracts\ResponsibilityLookup
+{
+    /** @var array<int, list<array>> Knoten => Verantwortliche */
+    public array $holders = [];
+    public array $calls = [];
+
+    public function hold(int $nodeId, int $personEntityId, ?int $userId, string $name, string $viaName = 'Führt an', string $kind = 'person', ?array $supervisor = null): void
+    {
+        $this->holders[$nodeId][] = [
+            'entity_id' => $personEntityId, 'user_id' => $userId, 'name' => $name, 'kind' => $kind,
+            'via' => 'relation', 'via_code' => 'rel_' . count($this->holders), 'via_name' => $viaName, 'rank' => count($this->holders[$nodeId] ?? []) + 1,
+            'node_entity_id' => $nodeId, 'deputy_for' => null, 'reason' => "{$viaName} an #{$nodeId}", 'supervisor' => $supervisor,
+        ];
+    }
+
+    public function holdersAt(int $nodeId, string $capability = 'manage', array $excludeEntityIds = [], ?\DateTimeInterface $at = null): array
+    {
+        $this->calls[] = ['holdersAt', $nodeId, $capability, $excludeEntityIds];
+
+        return array_values(array_filter($this->holders[$nodeId] ?? [], fn ($h) => ! in_array($h['entity_id'], $excludeEntityIds, true)));
+    }
+
+    public function responsibleFor(int $entityId, string $capability = 'manage', array $exclude = [], ?\DateTimeInterface $at = null): array
+    {
+        $this->calls[] = ['responsibleFor', $entityId, $capability, $exclude];
+        $path = [];
+        $current = OrganizationEntity::find($entityId);
+        for ($distance = 0; $current && $distance < 30; $distance++) {
+            $holders = array_values(array_filter($this->holders[$current->id] ?? [], fn ($h) => ! in_array($h['entity_id'], $exclude, true)));
+            $path[] = ['id' => (int) $current->id, 'name' => $current->name, 'reason' => $holders ? 'gefunden' : 'niemand verantwortlich'];
+            if ($holders) {
+                return ['entity_id' => $entityId, 'found' => true, 'node' => ['id' => (int) $current->id, 'name' => $current->name], 'distance' => $distance, 'holders' => $holders, 'path' => $path];
+            }
+            $current = $current->parent_entity_id ? OrganizationEntity::find($current->parent_entity_id) : null;
+        }
+
+        return ['entity_id' => $entityId, 'found' => false, 'node' => null, 'distance' => null, 'holders' => [], 'path' => $path];
+    }
+}

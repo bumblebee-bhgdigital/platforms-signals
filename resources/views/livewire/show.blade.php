@@ -122,7 +122,7 @@
                     @isset($dryRun['error'])
                         {{ $dryRun['error'] }}
                     @else
-                        {{ $dryRun['nodes'] }} Knoten im Geltungsbereich · {{ $dryRun['created'] }} neue Signale · {{ $dryRun['resolved'] }} würden sich auflösen.
+                        {{ $dryRun['nodes'] }} Knoten im Geltungsbereich · {{ $dryRun['created'] }} neue Signale@if(! empty($dryRun['reopened'])) · {{ $dryRun['reopened'] }} würden wieder geöffnet@endif · {{ $dryRun['resolved'] }} würden sich auflösen.
                         @foreach($dryRun['rows'] as $row)
                             <div class="mt-2">
                                 <div class="font-medium">{{ $row['template'] }}</div>
@@ -168,7 +168,7 @@
                                     </x-nx-table-cell>
                                     <x-nx-table-cell><span class="text-xs font-mono">{{ $P::assignment($a) }}</span></x-nx-table-cell>
                                     <x-nx-table-cell><x-nx-badge :variant="$P::severityVariant($a->effectiveSeverity())">{{ $P::SEVERITY_LABELS[$a->effectiveSeverity()] ?? $a->effectiveSeverity() }}</x-nx-badge></x-nx-table-cell>
-                                    <x-nx-table-cell><span class="text-xs">{{ $P::cadence($a) }}</span></x-nx-table-cell>
+                                    <x-nx-table-cell><span class="text-xs">{{ $P::cadence($a) }}</span><div class="text-xs text-[color:var(--nx-muted)]">{{ $P::policy($a) }}</div></x-nx-table-cell>
                                     <x-nx-table-cell align="right">
                                         <span class="text-xs text-[color:var(--nx-muted)]">{{ $a->last_evaluated_at?->diffForHumans() ?? 'noch nie' }}</span>
                                         @if($a->last_error)<div class="text-xs text-[color:var(--nx-danger)]" title="{{ $a->last_error }}">Fehler</div>@endif

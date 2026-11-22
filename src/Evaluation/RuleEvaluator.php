@@ -5,13 +5,19 @@ namespace Platform\Signals\Evaluation;
 use Illuminate\Support\Facades\DB;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
+use Platform\Organization\Models\OrganizationEntityType;
+use Platform\Signals\Contracts\ResponsibilityLookup;
 
 /**
  * Wertet ein Regel-Muster über die Kennzahlen-Snapshots der Organisation aus.
  * Die Muster (threshold, trend, ratio, cross_dimension) sind 1:1 aus der Organisation übernommen
  * (SignalEvaluationService), damit nach dem Umzug genau dasselbe anschlägt wie vorher.
  *
- * Liefert je auslösendem Knoten: ['entity_id', 'message', 'metrics'].
+ * Dazu no_responsible (Z7 „Einheit ohne Verantwortlichen“): jede Einheit (VSM-Klasse carrier) ohne jemanden mit
+ * der Fähigkeit (Standard manage) – gefragt über den Vertrag ResponsibilityLookup, nicht über Beziehungsnamen.
+ *
+ * Liefert je auslösendem Knoten: ['entity_id', 'message', 'metrics'] und optional 'recipient_from_entity_id'
+ * (Empfänger ab diesem Knoten suchen statt am Knoten selbst).
  */
 class RuleEvaluator
 {
@@ -27,6 +33,7 @@ class RuleEvaluator
             'trend' => $this->evaluateTrend($conditions, $entityIds),
             'cross_dimension' => $this->evaluateCrossDimension($conditions, $entityIds),
             'ratio' => $this->evaluateRatio($conditions, $entityIds),
+            'no_responsible' => $this->evaluateNoResponsible($conditions, $entityIds),
             default => [],
         };
     }
@@ -285,6 +292,34 @@ class RuleEvaluator
                     'metrics' => [$numerator => $numVal, $denominator => $denVal, 'ratio' => round($ratio, 4)],
                 ];
             }
+        }
+
+        return $triggered;
+    }
+
+    /**
+     * Einheit ohne Verantwortlichen: Träger (VSM-Klasse carrier) im Geltungsbereich, an denen niemand die Fähigkeit hält.
+     * conditions: {"capability": "manage"} (optional). Empfänger ist der Verantwortliche darüber (er muss benennen).
+     */
+    protected function evaluateNoResponsible(array $conditions, array $entityIds): array
+    {
+        $capability = (string) ($conditions['capability'] ?? 'manage') ?: 'manage';
+        $lookup = app(ResponsibilityLookup::class);
+        $triggered = [];
+
+        $carriers = OrganizationEntity::with('type:id,vsm_class')->whereIn('id', $entityIds)->get(['id', 'name', 'parent_entity_id', 'entity_type_id'])
+            ->filter(fn ($e) => $e->type?->vsm_class === OrganizationEntityType::VSM_CLASS_CARRIER);
+
+        foreach ($carriers as $unit) {
+            if ($lookup->holdersAt((int) $unit->id, $capability) !== []) {
+                continue;
+            }
+            $triggered[] = [
+                'entity_id' => (int) $unit->id,
+                'message' => "{$unit->name}: Einheit ohne Verantwortlichen – niemand hält hier die Fähigkeit „{$capability}“. Bitte einen Verantwortlichen eintragen.",
+                'metrics' => ['holders' => 0, 'capability' => $capability],
+                'recipient_from_entity_id' => $unit->parent_entity_id ? (int) $unit->parent_entity_id : null,
+            ];
         }
 
         return $triggered;

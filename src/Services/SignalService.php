@@ -52,7 +52,7 @@ class SignalService
             'trigger_metrics', 'evidence', 'responsible_user_id', 'assignee_entity_id', 'perspective_entity_id',
             'current_owner_entity_id', 'created_by_agent_entity_id', 'vsm_level', 'deadline_at', 'escalated_at',
             'acknowledged_at', 'snooze_until', 'resolved_at', 'resolved_by_user_id', 'dismissed_reason',
-            'resolution_note', 'legacy_organization_signal_id', 'created_at',
+            'resolution_note', 'legacy_organization_signal_id', 'created_at', 'signal_set_template_id',
         ]));
 
         return DB::transaction(function () use ($fields, $entityId, $message, $severity, $status, $data, $by) {
@@ -84,20 +84,25 @@ class SignalService
     }
 
     /**
-     * acknowledge | resolve | dismiss. Bei resolve/dismiss optional Notiz und Verweis (Beschluss, Aufgabe …).
+     * acknowledge | resolve | dismiss | reopen | reject. Bei resolve/dismiss optional Notiz und Verweis (Beschluss, Aufgabe …).
+     * reject = „gehört nicht zu mir“ (Begründung Pflicht) – eskaliert sofort eine Stufe (Z3).
+     * Die erste Reaktion (gesehen, gelöst, verworfen, abgelehnt) setzt reacted_at und stoppt die Reaktionsuhr.
      *
      * @param  array{reason?:string, resolution_note?:string, link_type?:string, link_id?:int, comment?:string}  $opts
      */
     public function transition(Signal $signal, string $action, ?User $by, array $opts = []): Signal
     {
-        if (! in_array($action, ['acknowledge', 'resolve', 'dismiss', 'reopen'], true)) {
-            throw new SignalSetException('action muss acknowledge, resolve, dismiss oder reopen sein.', 'VALIDATION_ERROR');
+        if (! in_array($action, ['acknowledge', 'resolve', 'dismiss', 'reopen', 'reject'], true)) {
+            throw new SignalSetException('action muss acknowledge, resolve, dismiss, reopen oder reject sein.', 'VALIDATION_ERROR');
         }
 
-        // acknowledged_at stoppt die Eskalation (whereNull('acknowledged_at')).
         $ackAt = $signal->acknowledged_at ?? now();
         $note = trim((string) ($opts['resolution_note'] ?? ''));
         $reason = trim((string) ($opts['reason'] ?? ''));
+
+        if ($action === 'reject') {
+            return $this->reject($signal, $reason, $by);
+        }
 
         $update = match ($action) {
             'acknowledge' => ['status' => 'acknowledged', 'acknowledged_at' => $ackAt],
@@ -105,6 +110,9 @@ class SignalService
             'dismiss' => ['status' => 'dismissed', 'dismissed_reason' => $reason ?: null, 'resolved_by_user_id' => $by?->id, 'acknowledged_at' => $ackAt],
             'reopen' => ['status' => 'open', 'resolved_at' => null, 'resolved_by_user_id' => null, 'dismissed_reason' => null],
         };
+        if ($action !== 'reopen') {
+            $update['reacted_at'] = $signal->reacted_at ?? now();
+        }
         if ($note !== '' && in_array($action, ['resolve', 'dismiss'], true)) {
             $update['resolution_note'] = $note;
         }
@@ -120,6 +128,22 @@ class SignalService
         if (trim((string) ($opts['comment'] ?? '')) !== '') {
             $this->comment($signal, (string) $opts['comment'], $by);
         }
+
+        return $signal->fresh();
+    }
+
+    /** „Gehört nicht zu mir“: Begründung Pflicht, Kommentar, sofort eine Stufe weiter (Ziel der Zuordnung). */
+    public function reject(Signal $signal, string $reason, ?User $by): Signal
+    {
+        if ($signal->isClosed()) {
+            throw new SignalSetException('Das Signal ist bereits geschlossen.', 'VALIDATION_ERROR');
+        }
+        if (trim($reason) === '') {
+            throw new SignalSetException('reason ist erforderlich: Warum gehört das Signal nicht zu dir?', 'VALIDATION_ERROR');
+        }
+        $signal->forceFill(['reacted_at' => $signal->reacted_at ?? now()])->save();
+        $this->comment($signal, 'Gehört nicht zu mir: ' . trim($reason), $by);
+        app(SignalEscalationService::class)->escalate($signal, 'rejected', 'abgelehnt: ' . mb_strimwidth(trim($reason), 0, 300, '…'), $by);
 
         return $signal->fresh();
     }

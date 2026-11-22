@@ -55,6 +55,16 @@ trait HandlesSignals
             'severity_override' => $a->severity_override,
             'frequency_override' => $a->frequency_override,
             'schedule_interval_hours_override' => $a->schedule_interval_hours_override,
+            'is_binding' => (bool) $a->is_binding,
+            'opts_out' => (bool) $a->opts_out,
+            'reaction_days' => $a->reaction_days,
+            'recurrence_count' => $a->recurrence_count,
+            'recurrence_window_days' => $a->recurrence_window_days,
+            'persistence_days' => $a->persistence_days,
+            'escalation_target' => $a->escalation_target,
+            'delivery' => $a->delivery,
+            'recipient_capability' => $a->recipient_capability,
+            'effective_policy' => $a->policy(),
             'effective' => [
                 'severity' => $a->effectiveSeverity(),
                 'conditions' => $a->template?->isRule() ? $a->effectiveConditions() : null,
@@ -74,7 +84,8 @@ trait HandlesSignals
     /** @return array<string,mixed> */
     protected function signalToArray(Signal $s, bool $detail = false): array
     {
-        $names = $this->entityNames(array_filter([$s->entity_id, $s->assignee_entity_id, $s->perspective_entity_id, $s->current_owner_entity_id, $s->created_by_agent_entity_id, $s->unit_entity_id, $s->committee_entity_id]));
+        $recipientIds = array_map('intval', (array) $s->recipient_entity_ids);
+        $names = $this->entityNames(array_filter(array_merge([$s->entity_id, $s->assignee_entity_id, $s->perspective_entity_id, $s->current_owner_entity_id, $s->created_by_agent_entity_id, $s->unit_entity_id, $s->committee_entity_id, $s->recipient_node_entity_id], $recipientIds)));
 
         $out = [
             'id' => $s->id,
@@ -102,6 +113,19 @@ trait HandlesSignals
             'agenda_ref' => $s->agenda_ref_id ? ['type' => $s->agenda_ref_type, 'id' => $s->agenda_ref_id] : null,
             'frame_ref_id' => $s->frame_ref_id,
             'outcome' => $s->outcome,
+            'signal_set_template_id' => $s->signal_set_template_id,
+            // Z2: Empfänger = nächster Verantwortlicher (nicht der Agent des Sets – der ist Absender/Begleiter: responsible_*)
+            'recipient_node_entity_id' => $s->recipient_node_entity_id,
+            'recipient_node_name' => $names[$s->recipient_node_entity_id] ?? null,
+            'recipients' => array_map(fn ($id) => ['entity_id' => $id, 'name' => $names[$id] ?? null], $recipientIds),
+            'recipient_user_ids' => array_map('intval', (array) $s->recipient_user_ids),
+            'recipient_reason' => $s->recipient_reason,
+            'delivered_at' => $s->delivered_at?->toIso8601String(),
+            'reacted_at' => $s->reacted_at?->toIso8601String(),
+            'escalation_level' => (int) $s->escalation_level,
+            'escalation_reason' => $s->escalation_reason,
+            'recurrence_count' => (int) ($s->recurrence_count ?? 1),
+            'reopened_at' => $s->reopened_at?->toIso8601String(),
             'responsible_user_id' => $s->responsible_user_id,
             'responsible' => $s->responsible?->name,
             'assignee_entity_id' => $s->assignee_entity_id,

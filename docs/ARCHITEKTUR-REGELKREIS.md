@@ -238,6 +238,19 @@ allem Lärm“).
 Eine Seite, drei Bereiche: **Bei mir** (ich bin der nächste Verantwortliche) · **Zu mir hochgekommen** (mit wer, wie
 lange, warum) · **Erledigt** (wodurch). Drei Knöpfe: **gesehen**, **gelöst (wodurch)**, **gehört nicht zu mir**.
 
+### Stand der Umsetzung (2026-11-22, Schritt 2 „Signals“)
+| | Stand |
+|---|---|
+| **Z1** | gebaut: `EffectiveAssignmentService` („das nächste gewinnt“), `is_binding`, `opts_out`, Politik-Felder an `signal_set_templates`; ein offenes Signal je Team/Knoten/Template; Typ-Filter `entity_types` entfernt (Schlüssel werden ignoriert). |
+| **Z2** | gebaut: Vertrag `ResponsibilityLookup` (Adapter auf die Organisation, sonst niemand), `SignalDelivery` mit Begründung, Betroffener übersprungen, Mensch des Agenten bei kritisch/Eskalation dabei. Offen: „mehrere Einheiten betroffen → gemeinsamer Elternknoten“, „Signale über Personen sehen nur Betroffener und Nächsthöherer“. |
+| **Z3** | gebaut: ignoriert (Arbeitstage), dauerhaft, wiederkehrend, abgelehnt; Ziel none / line / committee; Zeitleiter und S5-Aggregation entfernt. Offen: „pro Person höchstens N neue Vorgänge am Tag“. |
+| **Z4** | teilweise: Wiederöffnen statt neu („zum N. Mal in X Tagen“), Feld `delivery` an der Zuordnung. Offen: Vertrag `DeliveryChannel` / Parlan-Vorgang (Schritt 3). |
+| **Z5** | über den bestehenden Regelkreis: Übergabe an das Gremium als `stage=escalated`, der Steward hebt mit den vier Fragen. |
+| **Z6** | liegt in der Organisation (Schritt 1); Signals stellt nur die eine Frage. |
+| **Z7** | gebaut: Muster `no_responsible` (Träger ohne `manage`), Empfänger darüber, erledigt sich selbst. Signale der Einheit gehen dabei über die Suche nach oben von selbst eine Stufe höher (ohne eigenen Hinweis). Offen: Knopf „Verantwortlichen eintragen“. |
+| **Z8** | offen. |
+| **Z9** | gebaut: `/signals/mine` und `signals.mine.GET`. |
+
 ### Durchgerechnet
 **Projekt in FOOD.WORKS bis zum LA.** Regel trifft an Projekt P (Set an BHG.DIGITAL, vererbt) ⇒ nächster mit `manage`
 ist die Projektverantwortliche ⇒ Vorgang im Raum von P, Absender Ironhide ⇒ 3 Arbeitstage keine Reaktion ⇒ Venture

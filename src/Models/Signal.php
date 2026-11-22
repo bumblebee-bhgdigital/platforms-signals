@@ -13,7 +13,7 @@ use Platform\Organization\Models\OrganizationEntity;
 use Symfony\Component\Uid\UuidV7;
 
 /**
- * @ai.description Ausgelöstes Signal (algedonischer Alarm) an einem Knoten. Entsteht aus einem Template in einem Signal-Set (Regel-Auswertung oder Agent), aus dem Algedonic-Knopf oder per Eskalation/Aggregation. Lebenszyklus: open → acknowledged → resolved | dismissed; Auflösung mit Notiz und Verweis (z. B. Beschluss, Aufgabe, Agendapunkt).
+ * @ai.description Ausgelöstes Signal an einem Knoten. Entsteht aus einem Template in einem Signal-Set (Regel-Auswertung oder Agent), aus dem Algedonic-Knopf oder manuell. Geht an den nächsten Verantwortlichen (recipient_*), eskaliert nur, wenn nichts passiert (ignoriert, dauerhaft, wiederkehrend, abgelehnt). Lebenszyklus: open → acknowledged → resolved | dismissed; kommt es wieder, wird es wieder geöffnet (recurrence_count). Auflösung mit Notiz und Verweis (z. B. Beschluss, Aufgabe, Agendapunkt).
  */
 class Signal extends Model implements \Platform\Core\Contracts\HasDisplayName
 {
@@ -44,7 +44,20 @@ class Signal extends Model implements \Platform\Core\Contracts\HasDisplayName
         'legacy_organization_signal_id', 'created_at',
         'unit_entity_id', 'stage', 'committee_entity_id', 'meeting_ref_id', 'due_at', 'agenda_ref_type', 'agenda_ref_id',
         'frame_ref_id', 'outcome', 'origin_committee_entity_id',
+        'signal_set_template_id', 'recipient_node_entity_id', 'recipient_entity_ids', 'recipient_user_ids', 'recipient_reason',
+        'delivered_at', 'reacted_at', 'escalation_level', 'escalation_reason', 'recurrence_count', 'reopened_at',
     ];
+
+    protected $attributes = [
+        'escalation_level' => 0,
+        'recurrence_count' => 1,
+    ];
+
+    /**
+     * Nur beim Anlegen (nicht gespeichert): Empfänger ab diesem Knoten suchen statt ab entity_id
+     * (z. B. „Einheit ohne Verantwortlichen“: der Verantwortliche darüber muss benennen).
+     */
+    public ?int $deliverFromEntityId = null;
 
     protected $casts = [
         'affected_entity_ids' => 'array',
@@ -57,6 +70,13 @@ class Signal extends Model implements \Platform\Core\Contracts\HasDisplayName
         'aggregated_at' => 'datetime',
         'resolved_at' => 'datetime',
         'due_at' => 'datetime',
+        'recipient_entity_ids' => 'array',
+        'recipient_user_ids' => 'array',
+        'delivered_at' => 'datetime',
+        'reacted_at' => 'datetime',
+        'reopened_at' => 'datetime',
+        'escalation_level' => 'integer',
+        'recurrence_count' => 'integer',
     ];
 
     protected static function booted(): void
@@ -72,6 +92,12 @@ class Signal extends Model implements \Platform\Core\Contracts\HasDisplayName
                 app(\Platform\Signals\Services\CircleService::class)->deliver($model);
             } catch (\Throwable) {
                 // Zustellung darf das Anlegen nie verhindern
+            }
+            // Z2: an den nächsten Verantwortlichen (Frage an die Organisation)
+            try {
+                app(\Platform\Signals\Services\SignalDelivery::class)->deliver($model, $model->deliverFromEntityId);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Signals: Zustellung fehlgeschlagen', ['signal' => $model->id, 'error' => $e->getMessage()]);
             }
         });
     }
@@ -121,6 +147,17 @@ class Signal extends Model implements \Platform\Core\Contracts\HasDisplayName
     public function createdByAgent(): BelongsTo
     {
         return $this->belongsTo(OrganizationEntity::class, 'created_by_agent_entity_id');
+    }
+
+    /** Gewinnende Zuordnung (Z1) – bestimmt Politik und Eskalation. */
+    public function governingAssignment(): BelongsTo
+    {
+        return $this->belongsTo(SignalSetTemplate::class, 'signal_set_template_id');
+    }
+
+    public function recipientNode(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationEntity::class, 'recipient_node_entity_id');
     }
 
     public function responsible(): BelongsTo
@@ -193,12 +230,10 @@ class Signal extends Model implements \Platform\Core\Contracts\HasDisplayName
         return $q->whereNotNull('snooze_until')->where('snooze_until', '>', now());
     }
 
-    public function scopeDueForEscalation(Builder $q): Builder
+    /** Signale, deren Empfänger ein Nutzer ist (Z9 „Meine Signale“). */
+    public function scopeForRecipient(Builder $q, int $userId): Builder
     {
-        return $q->whereIn('status', ['open', 'acknowledged'])
-            ->whereNull('acknowledged_at')
-            ->whereNotNull('deadline_at')
-            ->where('deadline_at', '<', now());
+        return $q->whereJsonContains('recipient_user_ids', $userId);
     }
 
     public function scopeFocusedBy(Builder $q, int $userId): Builder

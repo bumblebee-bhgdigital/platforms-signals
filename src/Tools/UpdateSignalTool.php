@@ -24,7 +24,8 @@ class UpdateSignalTool implements ToolContract, ToolMetadataContract
     public function getDescription(): string
     {
         return 'PUT /signals/signals/{id} - Bearbeitet ein Signal. Pflicht: id. '
-            . 'action: acknowledge (gesehen, stoppt Eskalation) | resolve | dismiss | reopen | solve_locally (die Einheit hat es im Entscheidungsrahmen selbst gelöst; resolution_note Pflicht, frame_id optional). Beim Erledigen Rückkopplung festhalten: resolution_note (wodurch erledigt) '
+            . 'action: acknowledge (gesehen/übernommen, stoppt die Reaktionsuhr) | resolve | dismiss | reopen | reject („gehört nicht zu mir“, reason Pflicht – eskaliert sofort eine Stufe: Linie, Gremium oder nur markiert, je Zuordnung) '
+            . '| solve_locally (die Einheit hat es im Entscheidungsrahmen selbst gelöst; resolution_note Pflicht, frame_id optional). acknowledge/resolve/solve_locally/reject setzen reacted_at. Beim Erledigen Rückkopplung festhalten: resolution_note (wodurch erledigt) '
             . 'und Verweis link_type + link_id (Morph-Alias eines registrierten Objekt-Typs, z. B. eines Beschlusses oder einer Aufgabe; bei falschem Typ nennt der Fehler die erlaubten); reason bei dismiss. '
             . 'Außerdem: assignee_entity_id (zuweisen, 0 = entfernen), snooze_until (ISO, zurückstellen) / unsnooze=true, '
             . 'action_id + action_status (Maßnahme applied|dismissed|pending entscheiden; Signal-Status folgt), focus=true|false (eigener Fokus), comment.';
@@ -36,12 +37,12 @@ class UpdateSignalTool implements ToolContract, ToolMetadataContract
             'type' => 'object',
             'properties' => [
                 'id' => ['type' => 'integer', 'description' => 'ERFORDERLICH'],
-                'action' => ['type' => 'string', 'enum' => ['acknowledge', 'resolve', 'dismiss', 'reopen', 'solve_locally']],
+                'action' => ['type' => 'string', 'enum' => ['acknowledge', 'resolve', 'dismiss', 'reopen', 'reject', 'solve_locally']],
                 'frame_id' => ['type' => 'integer', 'description' => 'Mit solve_locally: Beschluss (Entscheidungsrahmen), auf den sich die lokale Lösung stützt.'],
                 'resolution_note' => ['type' => 'string'],
                 'link_type' => ['type' => 'string'],
                 'link_id' => ['type' => 'integer'],
-                'reason' => ['type' => 'string'],
+                'reason' => ['type' => 'string', 'description' => 'Pflicht bei reject (warum gehört es nicht zu mir?), optional bei dismiss.'],
                 'assignee_entity_id' => ['type' => 'integer'],
                 'snooze_until' => ['type' => 'string'],
                 'unsnooze' => ['type' => 'boolean'],
