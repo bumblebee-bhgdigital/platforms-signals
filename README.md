@@ -58,6 +58,18 @@ Direkt vs. vererbt: `SignalSetService::setsForNode()` bzw. `signals.signal_sets.
 - **Einheit ohne Verantwortlichen**: Muster `no_responsible` – jede Einheit (VSM-Klasse `carrier`) ohne jemanden mit `manage`; Empfänger ist der
   Verantwortliche darüber, Standard-Schweregrad critical; erledigt sich, sobald jemand eingetragen ist.
 - **Meine Signale**: `/signals/mine` (Bei mir · Zu mir hochgekommen · Erledigt; Knöpfe Gesehen, Gelöst, Gehört nicht zu mir) und `signals.mine.GET`.
+- **Ein Signal, ein Vorgang** (Z4, Schritt 3): Bei Zustellung *Vorgang* (Politik `delivery=task`; Standard kritisch/algedonisch, immer bei
+  Eskalation und „Einheit ohne Verantwortlichen“) führt der **Agent des Sets** einen Parlan-Vorgang im Kontext-Raum des Knotens. Signals kann in
+  Parlan nicht selbst handeln (nur signierte Aktionen der handelnden Identität) und legt darum **Aufträge** ab (`SignalDeliveryQueue`,
+  Tabelle `signal_delivery_ops`: `create`, `handover`, `comment`, `reopen`, `close`; je Signal der Reihe nach, höchstens ein `create`).
+  Auslöser: zugestellt → create · Linie → handover (Grund, wer hatte es, wie lange) · Gremium → comment · wieder aufgetreten → reopen ·
+  Halbzeit der Reaktionszeit ohne Reaktion → eine Erinnerung (`signals:escalate`) · gelöst/verworfen/automatisch aufgelöst → close.
+  Der Agent holt sie mit `signals.deliveries.GET` und meldet mit `signals.deliveries.POST` (thread, nach 5 Fehlversuchen `failed` + Systemkommentar).
+  Felder am Signal: `delivery_thread`, `delivery_room_entity_id`, `delivery_state` (null · pending · open · closed). Anleitung für den Agenten: `docs/AGENT-ZUSTELLUNG.md`.
+- **Rückweg aus Parlan**: Vertrag `Contracts\DeliveryChannel` (`onFeedback`), Registry `Support\DeliveryChannels`, Adapter
+  `Organization\OrganizationParlanFeedback` (einzige Stelle, die das Ereignis `CoordinationEventsRecorded` der Organisation kennt).
+  angenommen → gesehen · erledigt → gelöst („In Parlan erledigt“ + Notiz) · abgelehnt → „gehört nicht zu mir“ („In Parlan abgelehnt“ + Notiz, eine Stufe weiter).
+  Ignoriert: Reaktionen des Set-Agenten selbst, unbekannte Vorgänge, doppelte Ereignisse (`signal_delivery_events.event_id`).
 
 - **KI-Auswertung durch Agenten** (`InferenceContextService`): `signals.inference.GET` liefert die fälligen KI-Zuordnungen des Agenten bzw.
   mit `assignment_id` die Frage samt Knoten, offenen Signalen und Gedächtnis. Daten sammelt Signals nicht vor: der Agent liest sie selbst
@@ -68,10 +80,10 @@ Direkt vs. vererbt: `SignalSetService::setsForNode()` bzw. `signals.signal_sets.
 - **Neustart statt Umzug** (2026-11-22): Altsignale und Gedächtnis der Organisation werden nicht übernommen; Signals wertet ab dem Neustart nur mit den eigenen Templates aus.
 
 MCP: `signals.templates.GET/POST/PUT/DELETE`, `signals.set_templates.PUT`, `signals.signals.GET/POST/PUT`, `signals.evaluate.POST` (Probelauf),
-`signals.inference.GET/POST`, `signals.memory.GET/POST/PUT/DELETE`, `signals.committee_items.GET/POST`, `signals.mine.GET`.
+`signals.inference.GET/POST`, `signals.memory.GET/POST/PUT/DELETE`, `signals.committee_items.GET/POST`, `signals.mine.GET`, `signals.deliveries.GET/POST`.
 Oberfläche: `/signals/mine` (Meine Signale), Set-Seite (Templates, Probelauf, Signale), `/signals/signals` (Arbeitsliste + Detail), `/signals/templates`, `/signals/circle` (Regelkreis).
 
-Tests: `tests/run-in-taiste.sh tests/Feature/SignalsCoreTest.php tests/Feature/SignalsUiTest.php tests/Feature/SignalsInferenceTest.php tests/Feature/SignalsCircleTest.php tests/Feature/SignalsDeliveryTest.php`
+Tests: `tests/run-in-taiste.sh tests/Feature/SignalsCoreTest.php tests/Feature/SignalsUiTest.php tests/Feature/SignalsInferenceTest.php tests/Feature/SignalsCircleTest.php tests/Feature/SignalsDeliveryTest.php tests/Feature/SignalsChannelTest.php`
 
 ## Regelkreis Einheit → Lenkungsausschuss (Architektur v2, `docs/ARCHITEKTUR-REGELKREIS.md`)
 

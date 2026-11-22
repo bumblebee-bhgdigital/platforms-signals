@@ -5,7 +5,7 @@ namespace Platform\Signals\Console\Commands;
 use Illuminate\Console\Command;
 use Platform\Signals\Services\SignalEscalationService;
 
-/** Stündlich: Eskalation nur, wenn nichts passiert (Z3) – ignoriert, dauerhaft, wiederkehrend; eine Stufe je Auslöser. */
+/** Stündlich: Eskalation nur, wenn nichts passiert (Z3) – ignoriert, dauerhaft, wiederkehrend; eine Stufe je Auslöser. Dazu die Erinnerung zur Halbzeit im Vorgang (Z4). */
 class EscalateSignalsCommand extends Command
 {
     protected $signature = 'signals:escalate';
@@ -15,7 +15,7 @@ class EscalateSignalsCommand extends Command
     public function handle(SignalEscalationService $service): int
     {
         $r = $service->run();
-        $this->info("Geprüft: {$r['checked']} · weitergereicht: {$r['escalated']} · ans Gremium: {$r['committee']} · markiert: {$r['marked']}");
+        $this->info("Geprüft: {$r['checked']} · weitergereicht: {$r['escalated']} · ans Gremium: {$r['committee']} · markiert: {$r['marked']} · erinnert: {$r['reminded']}");
 
         return self::SUCCESS;
     }

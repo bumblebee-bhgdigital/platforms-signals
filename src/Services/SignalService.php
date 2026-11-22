@@ -124,12 +124,40 @@ class SignalService
 
         $signal->update($update);
         $this->recordFeedback($signal, $action, $reason, $note, $by);
+        $this->followInChannel($signal, $action, $note ?: $reason, $by, ! empty($opts['from_channel']));
 
         if (trim((string) ($opts['comment'] ?? '')) !== '') {
             $this->comment($signal, (string) $opts['comment'], $by);
         }
 
         return $signal->fresh();
+    }
+
+    /**
+     * Z4: den Parlan-Vorgang mitziehen. Gelöst/verworfen → schließen, wieder geöffnet → wieder öffnen.
+     * Kam die Reaktion selbst aus dem Vorgang (from_channel), ist er dort schon zu – nur den Stand merken.
+     */
+    protected function followInChannel(Signal $signal, string $action, string $text, ?User $by, bool $fromChannel): void
+    {
+        if (! in_array($action, ['resolve', 'dismiss', 'reopen'], true)) {
+            return;
+        }
+        if ($fromChannel) {
+            if ($signal->delivery_state) {
+                $signal->forceFill(['delivery_state' => 'closed'])->saveQuietly();
+            }
+
+            return;
+        }
+        $who = $by?->name ? " von {$by->name}" : '';
+        $queue = app(SignalDeliveryQueue::class);
+        if ($action === 'reopen') {
+            $queue->reopened($signal, "Wieder geöffnet{$who}.");
+
+            return;
+        }
+        $label = $action === 'resolve' ? 'Gelöst' : 'Verworfen';
+        $queue->closed($signal, "{$label}{$who} in der Plattform" . ($text !== '' ? ': ' . mb_strimwidth($text, 0, 500, '…') : '.'));
     }
 
     /** „Gehört nicht zu mir“: Begründung Pflicht, Kommentar, sofort eine Stufe weiter (Ziel der Zuordnung). */

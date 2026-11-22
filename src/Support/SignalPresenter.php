@@ -14,6 +14,8 @@ class SignalPresenter
     public const PATTERN_LABELS = ['threshold' => 'Schwelle', 'trend' => 'Trend', 'ratio' => 'Quote', 'cross_dimension' => 'Vergleich', 'no_responsible' => 'Ohne Verantwortlichen'];
     public const ESCALATION_TARGET_LABELS = ['none' => 'keins (Lagebild)', 'line' => 'Linie', 'committee' => 'Gremium'];
     public const DELIVERY_LABELS = ['overview' => 'Lagebild', 'task' => 'Vorgang'];
+    /** Z4: Stand des Parlan-Vorgangs. */
+    public const DELIVERY_STATE_LABELS = ['pending' => 'Vorgang wird angelegt', 'open' => 'Vorgang in Parlan offen', 'closed' => 'Vorgang in Parlan geschlossen'];
     public const TRIGGER_LABELS = ['ignored' => 'ignoriert', 'persistent' => 'dauerhaft', 'recurring' => 'wiederkehrend', 'rejected' => 'abgelehnt'];
 
     public static function severityVariant(?string $severity): string

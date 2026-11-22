@@ -46,7 +46,11 @@ class Signal extends Model implements \Platform\Core\Contracts\HasDisplayName
         'frame_ref_id', 'outcome', 'origin_committee_entity_id',
         'signal_set_template_id', 'recipient_node_entity_id', 'recipient_entity_ids', 'recipient_user_ids', 'recipient_reason',
         'delivered_at', 'reacted_at', 'escalation_level', 'escalation_reason', 'recurrence_count', 'reopened_at',
+        'delivery_thread', 'delivery_room_entity_id', 'delivery_state',
     ];
+
+    /** Z4: Stand des Vorgangs im Zustell-Kanal (Parlan). null = kein Vorgang (Zustellung über das Lagebild). */
+    public const DELIVERY_STATES = ['pending', 'open', 'closed'];
 
     protected $attributes = [
         'escalation_level' => 0,
@@ -189,6 +193,12 @@ class Signal extends Model implements \Platform\Core\Contracts\HasDisplayName
     public function actions(): HasMany
     {
         return $this->hasMany(SignalAction::class, 'signal_id')->orderBy('position');
+    }
+
+    /** Aufträge an den Agenten des Sets für den Parlan-Vorgang (Z4). */
+    public function deliveryOps(): HasMany
+    {
+        return $this->hasMany(SignalDeliveryOp::class, 'signal_id')->orderBy('id');
     }
 
     public function focuses(): HasMany

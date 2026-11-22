@@ -126,6 +126,10 @@ trait HandlesSignals
             'escalation_reason' => $s->escalation_reason,
             'recurrence_count' => (int) ($s->recurrence_count ?? 1),
             'reopened_at' => $s->reopened_at?->toIso8601String(),
+            // Z4: Vorgang im Zustell-Kanal (Parlan) – null = Zustellung über das Lagebild
+            'delivery_state' => $s->delivery_state,
+            'delivery_thread' => $s->delivery_thread,
+            'delivery_room_entity_id' => $s->delivery_room_entity_id,
             'responsible_user_id' => $s->responsible_user_id,
             'responsible' => $s->responsible?->name,
             'assignee_entity_id' => $s->assignee_entity_id,

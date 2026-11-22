@@ -34,21 +34,26 @@ class SignalEscalationService
     ) {
     }
 
-    /** @return array{checked:int, escalated:int, marked:int, committee:int} */
+    /** @return array{checked:int, escalated:int, marked:int, committee:int, reminded:int} */
     public function run(?CarbonInterface $now = null): array
     {
         $now ??= now();
-        $report = ['checked' => 0, 'escalated' => 0, 'marked' => 0, 'committee' => 0];
+        $report = ['checked' => 0, 'escalated' => 0, 'marked' => 0, 'committee' => 0, 'reminded' => 0];
+        $queue = app(SignalDeliveryQueue::class);
 
         Signal::query()->whereIn('status', ['open', 'acknowledged'])
             ->whereNotNull('delivered_at')
             ->where(fn ($q) => $q->whereNull('stage')->orWhere('stage', 'unit'))
             ->where(fn ($q) => $q->whereNull('snooze_until')->orWhere('snooze_until', '<=', $now))
-            ->chunkById(200, function ($chunk) use (&$report, $now) {
+            ->chunkById(200, function ($chunk) use (&$report, $now, $queue) {
                 foreach ($chunk as $signal) {
                     $report['checked']++;
                     $due = $this->dueTrigger($signal, $now);
                     if (! $due) {
+                        // Z4: einmal je Zustell-Zyklus zur Halbzeit der Reaktionszeit erinnern (Kommentar im Vorgang)
+                        if ($queue->remindIfDue($signal, $now)) {
+                            $report['reminded']++;
+                        }
                         continue;
                     }
                     $outcome = $this->escalate($signal, $due['trigger'], $due['reason'], null, $now);
@@ -118,6 +123,7 @@ class SignalEscalationService
             $this->circle->handToCommittee($signal, $committee);
             $signal->forceFill($base + ['escalation_level' => (int) $signal->escalation_level + 1])->save();
             $this->signals->comment($signal, "Eskaliert ({$reason}) – {$had}. An den {$committee['name']} übergeben: der Steward bereitet den LA-Punkt nach den vier Fragen vor.", $by, null, 'system');
+            app(SignalDeliveryQueue::class)->handedToCommittee($signal, (string) $committee['name'], "eskaliert ({$reason}) – {$had}");
 
             return 'committee';
         }
@@ -133,7 +139,10 @@ class SignalEscalationService
         $signal->escalation_level = (int) $signal->escalation_level + 1;
         $fields = $this->delivery->recipientFields($signal, $result);
         $signal->forceFill($base + $fields + ['delivered_at' => $now, 'reacted_at' => null])->save();
-        $this->signals->comment($signal, "Eskaliert ({$reason}) – {$had}. Jetzt bei " . $this->delivery->recipientNames($signal) . ": {$fields['recipient_reason']}.", $by, null, 'system');
+        $text = "Eskaliert ({$reason}) – {$had}. Jetzt bei " . $this->delivery->recipientNames($signal) . ": {$fields['recipient_reason']}.";
+        $this->signals->comment($signal, $text, $by, null, 'system');
+        // Z4: derselbe Vorgang wird an den Nächsten übergeben
+        app(SignalDeliveryQueue::class)->escalated($signal, $text);
 
         return 'escalated';
     }

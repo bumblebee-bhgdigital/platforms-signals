@@ -28,6 +28,7 @@
                     @if($s->vsm_level)<x-nx-badge variant="neutral">{{ strtoupper($s->vsm_level) }}</x-nx-badge>@endif
                     @if($s->escalated_at)<x-nx-badge variant="warning">eskaliert {{ $s->escalated_at->diffForHumans() }}@if($s->escalation_level) · Stufe {{ $s->escalation_level }}@endif</x-nx-badge>@endif
                     @if((int) $s->recurrence_count > 1)<x-nx-badge variant="warning">{{ $s->recurrence_count }}. Mal</x-nx-badge>@endif
+                    @if($s->delivery_state)<x-nx-badge variant="neutral" title="{{ $s->delivery_thread ? 'Parlan-Vorgang ' . $s->delivery_thread : '' }}">{{ $P::DELIVERY_STATE_LABELS[$s->delivery_state] ?? $s->delivery_state }}</x-nx-badge>@endif
                     @if($s->snooze_until && $s->snooze_until->isFuture())<x-nx-badge variant="neutral">zurückgestellt bis {{ $s->snooze_until->format('d.m.Y') }}</x-nx-badge>@endif
                 </div>
                 <h1 class="mt-2 mb-0 text-lg font-semibold text-[color:var(--nx-text)] whitespace-pre-line">{{ $s->message }}</h1>

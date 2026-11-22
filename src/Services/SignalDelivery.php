@@ -52,6 +52,11 @@ class SignalDelivery
             'delivered_at' => ! empty($result['found']) ? now() : null,
         ])->save();
 
+        // Z4: bei Zustellung als Vorgang den Agenten des Sets beauftragen (nur einmal je Signal)
+        if ($signal->delivered_at) {
+            app(SignalDeliveryQueue::class)->delivered($signal);
+        }
+
         return $signal;
     }
 

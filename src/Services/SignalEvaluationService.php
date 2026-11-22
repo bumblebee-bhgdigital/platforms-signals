@@ -238,8 +238,11 @@ class SignalEvaluationService
             app(SignalDelivery::class)->deliver($signal, $hit['recipient_from_entity_id'] ?? null, true);
         }
 
-        app(SignalService::class)->comment($signal, "Wieder aufgetreten – zum {$count}. Mal in " . ($days === 1 ? '1 Tag' : "{$days} Tagen") . '.'
-            . ($lastNote ? " Zuletzt gelöst: " . mb_strimwidth($lastNote, 0, 300, '…') : ''), null, null, 'system');
+        $text = "Wieder aufgetreten – zum {$count}. Mal in " . ($days === 1 ? '1 Tag' : "{$days} Tagen") . '.'
+            . ($lastNote ? " Zuletzt gelöst: " . mb_strimwidth($lastNote, 0, 300, '…') : '');
+        app(SignalService::class)->comment($signal, $text, null, null, 'system');
+        // Z4: derselbe Vorgang wird wieder geöffnet (an den aktuellen Empfänger)
+        app(SignalDeliveryQueue::class)->reopened($signal->fresh(), $text);
     }
 
     protected function autoResolve(Signal $signal, string $note): void
@@ -250,6 +253,7 @@ class SignalEvaluationService
             'acknowledged_at' => $signal->acknowledged_at ?? now(),
             'resolution_note' => $signal->resolution_note ?: $note,
         ]);
+        app(SignalDeliveryQueue::class)->closed($signal, $note);
     }
 
     /** Offene Regel-Signale eines Templates an Knoten, an denen keine Zuordnung (mehr) gilt. */

@@ -238,14 +238,14 @@ allem Lärm“).
 Eine Seite, drei Bereiche: **Bei mir** (ich bin der nächste Verantwortliche) · **Zu mir hochgekommen** (mit wer, wie
 lange, warum) · **Erledigt** (wodurch). Drei Knöpfe: **gesehen**, **gelöst (wodurch)**, **gehört nicht zu mir**.
 
-### Stand der Umsetzung (2026-11-22, Schritt 2 „Signals“)
+### Stand der Umsetzung (2026-11-22, Schritt 2 „Signals“ und Schritt 3 „Parlan-Kanal“)
 | | Stand |
 |---|---|
 | **Z1** | gebaut: `EffectiveAssignmentService` („das nächste gewinnt“), `is_binding`, `opts_out`, Politik-Felder an `signal_set_templates`; ein offenes Signal je Team/Knoten/Template; Typ-Filter `entity_types` entfernt (Schlüssel werden ignoriert). |
 | **Z2** | gebaut: Vertrag `ResponsibilityLookup` (Adapter auf die Organisation, sonst niemand), `SignalDelivery` mit Begründung, Betroffener übersprungen, Mensch des Agenten bei kritisch/Eskalation dabei. Offen: „mehrere Einheiten betroffen → gemeinsamer Elternknoten“, „Signale über Personen sehen nur Betroffener und Nächsthöherer“. |
 | **Z3** | gebaut: ignoriert (Arbeitstage), dauerhaft, wiederkehrend, abgelehnt; Ziel none / line / committee; Zeitleiter und S5-Aggregation entfernt. Offen: „pro Person höchstens N neue Vorgänge am Tag“. |
-| **Z4** | teilweise: Wiederöffnen statt neu („zum N. Mal in X Tagen“), Feld `delivery` an der Zuordnung. Offen: Vertrag `DeliveryChannel` / Parlan-Vorgang (Schritt 3). |
-| **Z5** | über den bestehenden Regelkreis: Übergabe an das Gremium als `stage=escalated`, der Steward hebt mit den vier Fragen. |
+| **Z4** | gebaut (Schritt 3): ein Signal, ein Vorgang. Der **Agent des Sets** führt den Parlan-Vorgang (Parlan nimmt nur signierte Aktionen der handelnden Identität an – Signals kann dort nichts im Namen des Agenten tun). Signals legt Aufträge ab (`signal_delivery_ops`: create · handover · comment · reopen · close), der Agent holt sie per `signals.deliveries.GET` und meldet per `signals.deliveries.POST` (Thread-ID). Auslöser: Zustellung, Linie, Gremium, Wiederöffnen, Erinnerung zur Halbzeit, Lösen/Verwerfen/Auto-Auflösung. Rückweg: Vertrag `DeliveryChannel` (`onFeedback`), Adapter auf das Ereignis `CoordinationEventsRecorded` der Organisation; angenommen/erledigt/abgelehnt → gesehen/gelöst/„gehört nicht zu mir“. Anleitung: `docs/AGENT-ZUSTELLUNG.md`. Offen: echtes Wiederöffnen in Parlan (heute ggf. neuer Vorgang, neue Thread-ID), Notiz/Begründung im Ereignis der Organisation, gebündelte Morgen-Nachricht fürs Lagebild. |
+| **Z5** | über den bestehenden Regelkreis: Übergabe an das Gremium als `stage=escalated`, der Steward hebt mit den vier Fragen; im Vorgang steht „liegt jetzt beim …“. Offen: Sitzungstermin und Beschluss als Kommentar im Vorgang. |
 | **Z6** | liegt in der Organisation (Schritt 1); Signals stellt nur die eine Frage. |
 | **Z7** | gebaut: Muster `no_responsible` (Träger ohne `manage`), Empfänger darüber, erledigt sich selbst. Signale der Einheit gehen dabei über die Suche nach oben von selbst eine Stufe höher (ohne eigenen Hinweis). Offen: Knopf „Verantwortlichen eintragen“. |
 | **Z8** | offen. |
@@ -267,7 +267,7 @@ Ist die Ablehnquote des Templates hoch, meldet Z8 dem Agenten des Sets, dass die
 1. **Organisation:** Rang, Vertretung, Abfrage „verantwortlich“, Vertrag Verfügbarkeit.
 2. **Signals:** Vererbung „nächstes gewinnt“, Empfänger über `manage`, Eskalation (Z3), Zeitleiter raus,
    „Einheit ohne Verantwortlichen“, „Meine Signale“, Kennzahlen der Schleife.
-3. **Parlan-Kanal:** ein Signal, ein Vorgang im Kontext-Raum.
+3. **Parlan-Kanal:** ein Signal, ein Vorgang im Kontext-Raum. *(gebaut in Signals; Organisation liefert das Ereignis, Agent führt den Vorgang)*
 4. **People:** Abwesenheiten (parallel möglich – bis dahin gelten alle als anwesend).
 
 ## Verantwortung der Module
@@ -276,7 +276,7 @@ Ist die Ablehnquote des Templates hoch, meldet Z8 dem Agenten des Sets, dass die
 |---|---|
 | **Organisation** | Knoten, Beziehungen mit Fähigkeiten und Rang, Vertretung, Abfrage „verantwortlich“, Kennzahlen. Keine Signal-Logik mehr. |
 | **People** | Abwesenheiten (bindet den Vertrag Verfügbarkeit der Organisation). |
-| **Parlan-Adapter** | setzt `DeliveryChannel` um: ein Signal, ein Vorgang im Kontext-Raum. |
+| **Parlan-Adapter** | Rückweg: `OrganizationParlanFeedback` setzt `DeliveryChannel` um (Ereignis der Organisation). Hinweg: der Agent des Sets führt die Aufträge mit seinem eigenen Parlan-Zugang aus. |
 | **Signals** | Sets (vererbt, nächstes gewinnt), Templates, Signale mit Stufe und Ausgang, Zustellung und Eskalation, Lagebild, Gedächtnis, Verträge `CommitteeGateway` und `DeliveryChannel`. |
 | **Management Book** | Gremien, Sitzungen, Agendapunkte nach den vier Fragen, Beschlüsse (inkl. `frame`), Ergebnis-Checks; setzt `CommitteeGateway` um. |
 | **Agenten** (MCP) | wahrnehmen, in die Hilfelogik übersetzen, lokal lösen im Rahmen, LA-Punkte vorbefüllen, Lagebild, umsetzen. |

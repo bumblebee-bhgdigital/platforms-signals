@@ -40,6 +40,7 @@
                                             @if($s->status === 'acknowledged')<x-nx-badge variant="info" dot>gesehen</x-nx-badge>@endif
                                             @if((int) $s->recurrence_count > 1)<x-nx-badge variant="warning">{{ $s->recurrence_count }}. Mal</x-nx-badge>@endif
                                             @if((int) $s->escalation_level > 0)<x-nx-badge variant="warning">Stufe {{ $s->escalation_level }}</x-nx-badge>@endif
+                                            @if($s->delivery_state)<x-nx-badge variant="neutral" title="{{ $s->delivery_thread ? 'Parlan-Vorgang ' . $s->delivery_thread : '' }}">{{ $P::DELIVERY_STATE_LABELS[$s->delivery_state] ?? $s->delivery_state }}</x-nx-badge>@endif
                                             <a href="{{ route('signals.signals.show', $s) }}" wire:navigate class="text-sm font-medium hover:underline">{{ \Illuminate\Support\Str::limit($s->message, 140) }}</a>
                                         </div>
                                         <div class="mt-1 text-xs text-[color:var(--nx-muted)]">

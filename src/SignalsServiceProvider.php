@@ -205,7 +205,19 @@ class SignalsServiceProvider extends ServiceProvider
         $this->registerEntityLinkProvider();
         $this->registerTools();
         $this->registerAlgedonicListener();
+        $this->registerDeliveryChannel();
         $this->registerSchedule();
+    }
+
+    /**
+     * Z4 Rückweg aus Parlan: Reaktionen im Vorgang (angenommen, erledigt, abgelehnt) kommen über das Ereignis der
+     * Organisation. Der Adapter ist die einzige Stelle, die es kennt; ohne Organisation läuft Signals über die Seite.
+     */
+    protected function registerDeliveryChannel(): void
+    {
+        if (\Platform\Signals\Organization\OrganizationParlanFeedback::available()) {
+            \Platform\Signals\Support\DeliveryChannels::register(new \Platform\Signals\Organization\OrganizationParlanFeedback());
+        }
     }
 
     /** Algedonic-Kanal (Beer): Core dispatcht, Signals erzeugt das Signal. */
@@ -308,7 +320,7 @@ class SignalsServiceProvider extends ServiceProvider
         );
     }
 
-    /** MCP-Tools: signal_sets, templates, set_templates, signals, evaluate, inference, memory, committee_items, mine. */
+    /** MCP-Tools: signal_sets, templates, set_templates, signals, evaluate, inference, memory, committee_items, mine, deliveries. */
     protected function registerTools(): void
     {
         try {
@@ -335,6 +347,8 @@ class SignalsServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Signals\Tools\CreateCommitteeItemTool());
             $registry->register(new \Platform\Signals\Tools\GetCommitteeSituationTool());
             $registry->register(new \Platform\Signals\Tools\GetMySignalsTool());
+            $registry->register(new \Platform\Signals\Tools\GetDeliveriesTool());
+            $registry->register(new \Platform\Signals\Tools\ReportDeliveryTool());
         } catch (\Throwable $e) {
             // ToolRegistry nicht verfügbar
         }
