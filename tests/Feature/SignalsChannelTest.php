@@ -22,6 +22,7 @@ use Platform\Signals\Support\DeliveryChannels;
 use Platform\Signals\Tools\GetDeliveriesTool;
 use Platform\Signals\Tools\GetMySignalsTool;
 use Platform\Signals\Tools\ReportDeliveryTool;
+use Platform\Signals\Tools\UpdateSignalSetTool;
 use Platform\Signals\Tools\UpsertSetTemplateTool;
 use Tests\TestCase;
 
@@ -381,6 +382,29 @@ class SignalsChannelTest extends TestCase
         // späte Reaktion im alten Vorgang zählt noch
         $this->channel->emit('th-a1', 'accepted', $this->users['Anna']->id, null, 'e-late');
         $this->assertSame('acknowledged', $signal->fresh()->status);
+    }
+
+    public function test_delivery_agent_of_the_set_takes_the_orders_instead_of_the_responsible_agent(): void
+    {
+        $iron = \Platform\Core\Models\User::create(['name' => 'Iron', 'email' => 'iron@x.test', 'password' => 'x']);
+        $iron->forceFill(['type' => 'ai_user', 'current_team_id' => $this->s['teamId']])->save();
+        DB::table('team_user')->insert(['team_id' => $this->s['teamId'], 'user_id' => $iron->id, 'role' => 'member', 'created_at' => now(), 'updated_at' => now()]);
+        $r = $this->tool(UpdateSignalSetTool::class, ['id' => $this->general->id, 'delivery_agent_user_id' => $iron->id]);
+        $this->assertTrue($r->success, json_encode($r->error ?? null));
+        $this->assertSame($iron->id, (int) $r->data['signal_set']['delivery_agent_user_id']);
+
+        $this->evaluate();
+        $signal = $this->at('a1');
+        $this->assertSame([], $this->tool(GetDeliveriesTool::class, [], $this->s['agent'])->data['deliveries'], 'der Sensor bekommt keine Aufträge');
+        $rows = $this->tool(GetDeliveriesTool::class, [], $iron)->data['deliveries'];
+        $this->assertSame([$signal->id], array_column($rows, 'signal_id'));
+        $this->assertTrue($this->report($rows[0]['op_id'], true, 'th-iron', null, $iron)->success);
+
+        // eigene Aktion des Zustell-Agenten zählt nicht als Reaktion
+        $this->channel->emit('th-iron', 'accepted', $iron->id, null, 'e-iron');
+        $this->assertNull($signal->fresh()->reacted_at);
+        // verantwortlicher Agent bleibt für die KI-Auswertung
+        $this->assertSame($this->s['agent']->id, (int) $this->general->fresh()->responsible_agent_user_id);
     }
 
     public function test_open_signal_without_delivery_is_delivered_on_the_next_run(): void

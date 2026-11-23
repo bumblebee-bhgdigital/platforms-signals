@@ -53,7 +53,7 @@ class SignalDeliveryQueue
     /** Agent des Sets (Absender und Begleiter); ohne Set der verantwortliche Agent des Signals. */
     public function agentUserId(Signal $signal): ?int
     {
-        $id = $signal->signal_set_id ? SignalSet::withTrashed()->whereKey($signal->signal_set_id)->value('responsible_agent_user_id') : null;
+        $id = $signal->signal_set_id ? SignalSet::withTrashed()->find($signal->signal_set_id)?->deliveryAgentUserId() : null;
 
         return $id ? (int) $id : ($signal->responsible_user_id ? (int) $signal->responsible_user_id : null);
     }
@@ -323,7 +323,8 @@ class SignalDeliveryQueue
      */
     public function pendingFor(int $agentUserId, ?int $signalId = null, int $limit = 100): array
     {
-        $setIds = SignalSet::withTrashed()->where('responsible_agent_user_id', $agentUserId)->pluck('id')->all();
+        $setIds = SignalSet::withTrashed()->where(fn ($q) => $q->where('delivery_agent_user_id', $agentUserId)
+            ->orWhere(fn ($w) => $w->whereNull('delivery_agent_user_id')->where('responsible_agent_user_id', $agentUserId)))->pluck('id')->all();
         $ops = SignalDeliveryOp::query()->where('status', 'pending')
             ->whereHas('signal', fn ($q) => $q->where(fn ($w) => $w->whereIn('signal_set_id', $setIds ?: [0])
                 ->orWhere(fn ($x) => $x->whereNull('signal_set_id')->where('responsible_user_id', $agentUserId))))

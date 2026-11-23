@@ -24,7 +24,7 @@ use Platform\Signals\Models\SignalSetNode;
 class SignalSetService
 {
     /** Felder, die create()/update() aus $data übernehmen. */
-    private const FIELDS = ['title', 'description', 'owner_user_id', 'responsible_agent_user_id'];
+    private const FIELDS = ['title', 'description', 'owner_user_id', 'responsible_agent_user_id', 'delivery_agent_user_id'];
 
     // ── Lesen ────────────────────────────────────────────────────
 
@@ -344,10 +344,12 @@ class SignalSetService
             }
         }
 
-        if (! empty($out['responsible_agent_user_id'])) {
-            $agent = User::find((int) $out['responsible_agent_user_id']);
-            if (! $agent || ! \Platform\Signals\Support\Agents::isAgent($agent)) {
-                throw new SignalSetException('responsible_agent_user_id muss ein Agent sein (Agent-Knoten in der Organisation oder type ai_user).');
+        foreach (['responsible_agent_user_id', 'delivery_agent_user_id'] as $field) {
+            if (! empty($out[$field])) {
+                $agent = User::find((int) $out[$field]);
+                if (! $agent || ! \Platform\Signals\Support\Agents::isAgent($agent)) {
+                    throw new SignalSetException("{$field} muss ein Agent sein (Agent-Knoten in der Organisation oder type ai_user).");
+                }
             }
         }
 

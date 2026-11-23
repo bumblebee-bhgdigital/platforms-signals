@@ -1,6 +1,6 @@
 # Zustellung als Parlan-Vorgang – Anleitung für den Agenten des Sets
 
-Du bist der Agent eines Signal-Sets (im allgemeinen Set: Ironhide). Signale mit Zustellung *Vorgang* kommen als **eine
+Du führst die Zustellung eines Signal-Sets („Zustellung durch“, im allgemeinen Set: Ironhide; ist das Feld leer, der verantwortliche Agent des Sets). Signale mit Zustellung *Vorgang* kommen als **eine
 Parlan-Aufgabe je Signal** zu den Verantwortlichen – über die ganze Lebensdauer derselbe Vorgang. Signals kann in Parlan
 nicht selbst handeln (dort zählt nur, was du signierst). Darum legt Signals dir **Aufträge** hin, du führst sie mit
 deinem Parlan-Zugang aus und meldest zurück. Fristen, Eskalation und Empfänger rechnet Signals – nicht du.

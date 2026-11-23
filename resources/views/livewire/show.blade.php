@@ -106,6 +106,7 @@
             </x-nx-property-row>
             <x-nx-property-row icon="heroicon-o-user" label="Owner">{{ $set->owner?->name ?? '–' }}</x-nx-property-row>
             <x-nx-property-row icon="heroicon-o-cpu-chip" label="Verantwortlicher Agent">{{ $set->responsibleAgent?->name ?? '–' }}</x-nx-property-row>
+            <x-nx-property-row icon="heroicon-o-paper-airplane" label="Zustellung durch">{{ $set->deliveryAgent?->name ?? ($set->responsibleAgent?->name ? $set->responsibleAgent->name . ' (wie verantwortlich)' : '–') }}</x-nx-property-row>
         </x-nx-card>
 
         @php($P = \Platform\Signals\Support\SignalPresenter::class)

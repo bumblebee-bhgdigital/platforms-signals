@@ -41,6 +41,7 @@ class SignalSet extends Model implements HasDisplayName
         'status',
         'owner_user_id',
         'responsible_agent_user_id',
+        'delivery_agent_user_id',
         'created_by_user_id',
     ];
 
@@ -79,6 +80,19 @@ class SignalSet extends Model implements HasDisplayName
     public function responsibleAgent(): BelongsTo
     {
         return $this->belongsTo(\Platform\Core\Models\User::class, 'responsible_agent_user_id');
+    }
+
+    /** Z4: führt die Parlan-Vorgänge – leer = der verantwortliche Agent. */
+    public function deliveryAgent(): BelongsTo
+    {
+        return $this->belongsTo(\Platform\Core\Models\User::class, 'delivery_agent_user_id');
+    }
+
+    public function deliveryAgentUserId(): ?int
+    {
+        $id = $this->delivery_agent_user_id ?: $this->responsible_agent_user_id;
+
+        return $id ? (int) $id : null;
     }
 
     public function creator(): BelongsTo

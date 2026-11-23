@@ -24,7 +24,7 @@ class UpdateSignalSetTool implements ToolContract, ToolMetadataContract
     public function getDescription(): string
     {
         return 'PUT /signal-sets/{id} - Ändert ein Signal-Set. Pflicht: id. '
-            . 'Felder ändern (title, description, owner_user_id, responsible_agent_user_id). '
+            . 'Felder ändern (title, description, owner_user_id, responsible_agent_user_id, delivery_agent_user_id = Zustellung durch). '
             . 'status=active aktiviert das Set, status=archived archiviert es. '
             . 'Knoten (ein Set kann an mehrere Knoten hängen): entity_id hängt zusätzlich an diesen Knoten (inherit_down = Vererbung nach unten; ist das Set dort schon verknüpft und inherit_down gesetzt, wird nur die Vererbung geändert). '
             . 'from_entity_id + entity_id hängt von einem Knoten auf einen anderen um (Vererbungs-Option wandert mit). '
@@ -90,7 +90,7 @@ class UpdateSignalSetTool implements ToolContract, ToolMetadataContract
 
             $service = app(SignalSetService::class);
 
-            $fields = array_intersect_key($arguments, array_flip(['title', 'description', 'owner_user_id', 'responsible_agent_user_id']));
+            $fields = array_intersect_key($arguments, array_flip(['title', 'description', 'owner_user_id', 'responsible_agent_user_id', 'delivery_agent_user_id']));
             if ($fields !== []) {
                 $set = $service->update($set, $fields);
             }

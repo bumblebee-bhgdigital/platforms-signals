@@ -74,6 +74,7 @@ trait HandlesSignalSets
             'status_label' => $set->status?->label(),
             'owner_user_id' => $set->owner_user_id,
             'responsible_agent_user_id' => $set->responsible_agent_user_id,
+            'delivery_agent_user_id' => $set->delivery_agent_user_id,
             'created_by_user_id' => $set->created_by_user_id,
             'nodes' => array_map(
                 fn ($id, $inherit) => ['entity_id' => $id, 'entity_name' => $names[$id] ?? null, 'inherit_down' => $inherit],
@@ -102,7 +103,8 @@ trait HandlesSignalSets
             'title' => ['type' => 'string', 'description' => 'Titel des Signal-Sets.'],
             'description' => ['type' => 'string', 'description' => 'Beschreibung / Zweck des Sets.'],
             'owner_user_id' => ['type' => 'integer', 'description' => 'Owner (User-ID, Mitglied des Teams). Default beim Anlegen: aufrufender User.'],
-            'responsible_agent_user_id' => ['type' => 'integer', 'description' => 'Verantwortlicher Agent (User-ID eines Agenten: Konto am Agent-Knoten der Organisation oder type ai_user).'],
+            'responsible_agent_user_id' => ['type' => 'integer', 'description' => 'Verantwortlicher Agent (User-ID eines Agenten: Konto am Agent-Knoten der Organisation oder type ai_user). Wertet die KI-Templates aus.'],
+            'delivery_agent_user_id' => ['type' => ['integer', 'null'], 'description' => 'Zustellung durch: Agent, der die Parlan-Vorgänge der Signale führt (signals.deliveries.*). Leer = der verantwortliche Agent.'],
         ];
     }
 }
