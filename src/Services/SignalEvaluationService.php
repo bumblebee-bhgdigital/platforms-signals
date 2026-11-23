@@ -46,10 +46,11 @@ class SignalEvaluationService
     /**
      * @param  int|null  $setId  nur Zuordnungen dieses Sets (dort, wo sie gewinnen)
      * @param  bool  $force  Takt ignorieren
-     * @param  bool  $dryRun  nichts schreiben, nur berichten
+     * @param  bool  $dryRun  nichts schreiben, nur berichten (je Template: hits mit action new|open|reopen und Empfängern, resolving)
+     * @param  int|null  $templateId  nur dieses Template auswerten
      * @return array{sets:int, evaluated:int, created:int, resolved:int, reopened:int, skipped_not_due:int, results:array}
      */
-    public function run(?int $setId = null, bool $force = false, bool $dryRun = false, ?int $teamId = null): array
+    public function run(?int $setId = null, bool $force = false, bool $dryRun = false, ?int $teamId = null, ?int $templateId = null): array
     {
         $query = SignalSet::query()->where('status', SignalSetStatus::ACTIVE->value)
             ->with(['templateAssignments.template']);
@@ -67,7 +68,9 @@ class SignalEvaluationService
         // Regel-Templates, die in diesen Sets aktiv zugeordnet sind
         $templates = $sets->flatMap(fn (SignalSet $set) => $set->templateAssignments)
             ->filter(fn (SignalSetTemplate $a) => $a->is_active && ! $a->opts_out && $a->template && $a->template->is_active && $a->template->isRule())
-            ->map(fn (SignalSetTemplate $a) => $a->template)->unique('id')->values();
+            ->map(fn (SignalSetTemplate $a) => $a->template)->unique('id')
+            ->when($templateId, fn ($c) => $c->filter(fn (SignalTemplate $t) => (int) $t->id === (int) $templateId))
+            ->values();
         $setIds = $sets->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         foreach ($templates as $template) {
@@ -114,7 +117,7 @@ class SignalEvaluationService
             }
 
             // Wo keine Zuordnung mehr gilt (abgewählt, Set abgehängt), schließen sich offene Regel-Signale selbst
-            if (! $setId) {
+            if (! $setId && ! $templateId) {
                 $covered = array_keys(array_filter($map));
                 $report['resolved'] += $this->resolveUncovered($template, $covered, $dryRun);
             }
@@ -139,11 +142,16 @@ class SignalEvaluationService
         }
         $triggered = $this->rules->evaluate((string) $template->pattern_type, $conditions, $entityIds);
         $triggeredIds = array_map(fn ($t) => (int) $t['entity_id'], $triggered);
+        // units_only: Knoten, die keine Einheit sind, werten nicht mehr aus – ihre offenen Signale lösen sich unten auf
+        $unitIds = RuleEvaluator::isUnitsOnly((string) $template->pattern_type, $conditions) ? $this->rules->unitIds($entityIds) : null;
 
         $resolved = 0;
         $created = 0;
         $reopened = 0;
+        $hits = [];
+        $resolving = [];
         $same = fn () => Signal::query()->where('team_id', $set->team_id)->where('signal_template_id', $template->id);
+        $names = $this->names(array_merge($triggeredIds, $same()->whereIn('entity_id', $entityIds)->whereIn('status', ['open', 'acknowledged'])->pluck('entity_id')->all()));
 
         // Signale, deren Bedingung nicht mehr erfüllt ist, schließen sich selbst (wie bisher).
         $stale = $same()->whereIn('entity_id', $entityIds)->whereIn('status', ['open', 'acknowledged'])
@@ -151,15 +159,22 @@ class SignalEvaluationService
             ->get();
         foreach ($stale as $signal) {
             $resolved++;
+            $note = $unitIds !== null && ! in_array((int) $signal->entity_id, $unitIds, true)
+                ? $this->perUnitNote((int) $signal->entity_id)
+                : 'Automatisch aufgelöst: Bedingung nicht mehr erfüllt.';
+            $resolving[] = ['signal_id' => $signal->id, 'entity_id' => (int) $signal->entity_id, 'entity' => $names[(int) $signal->entity_id] ?? null, 'note' => $note];
             if (! $dryRun) {
-                $this->autoResolve($signal, 'Automatisch aufgelöst: Bedingung nicht mehr erfüllt.');
+                $this->autoResolve($signal, $note);
             }
         }
 
         foreach ($triggered as $hit) {
+            $row = ['entity_id' => (int) $hit['entity_id'], 'entity' => $names[(int) $hit['entity_id']] ?? null, 'message' => $hit['message'],
+                'contributors' => $hit['metrics']['contributors'] ?? null];
             // ein offenes Signal je (Team, Knoten, Template) – egal aus welchem Set
             $open = $same()->where('entity_id', $hit['entity_id'])->whereIn('status', ['open', 'acknowledged'])->first();
             if ($open) {
+                $hits[] = $row + ['action' => 'open', 'signal_id' => $open->id];
                 if (! $dryRun && (int) $open->signal_set_template_id !== (int) $assignment->id) {
                     $open->forceFill(['signal_set_template_id' => $assignment->id, 'signal_set_id' => $set->id])->save();
                 }
@@ -176,6 +191,7 @@ class SignalEvaluationService
                 ->orderByDesc('resolved_at')->first();
             if ($recent) {
                 $reopened++;
+                $hits[] = $row + ['action' => 'reopen', 'signal_id' => $recent->id] + ($dryRun ? ['recipients' => $this->wouldBeRecipients($hit, $policy)] : []);
                 if (! $dryRun) {
                     $this->reopen($recent, $set, $assignment, $hit);
                 }
@@ -183,6 +199,7 @@ class SignalEvaluationService
             }
 
             $created++;
+            $hits[] = $row + ['action' => 'new', 'signal_id' => null] + ($dryRun ? ['recipients' => $this->wouldBeRecipients($hit, $policy)] : []);
             if (! $dryRun) {
                 $signal = new Signal([
                     'team_id' => $set->team_id,
@@ -210,10 +227,50 @@ class SignalEvaluationService
             'template' => $template->name,
             'nodes' => count($entityIds),
             'triggered' => $triggered,
+            'hits' => $hits,
+            'resolving' => $resolving,
             'created' => $created,
             'resolved' => $resolved,
             'reopened' => $reopened,
         ];
+    }
+
+    /** @return array<int, string> */
+    protected function names(array $entityIds): array
+    {
+        $entityIds = array_values(array_unique(array_map('intval', $entityIds)));
+
+        return $entityIds === [] ? [] : OrganizationEntity::whereIn('id', $entityIds)->pluck('name', 'id')->all();
+    }
+
+    /** Auflösungsnotiz, wenn eine Regel auf units_only umgestellt wurde und der Knoten keine Einheit ist. */
+    protected function perUnitNote(int $entityId): string
+    {
+        $unit = $this->rules->nearestUnit($entityId);
+
+        return 'Automatisch aufgelöst: Regel zählt jetzt je Einheit' . ($unit ? " – zusammengefasst an {$unit['name']}." : '.');
+    }
+
+    /**
+     * Nur im Probelauf: an wen würde ein neues/wieder geöffnetes Signal gehen? Nur lesend über ResponsibilityLookup
+     * (wie SignalDelivery: ab dem Knoten aufwärts, der Betroffene selbst übersprungen).
+     *
+     * @return array{found:bool, node:?string, holders:list<string>}
+     */
+    protected function wouldBeRecipients(array $hit, array $policy): array
+    {
+        try {
+            $from = (int) ($hit['recipient_from_entity_id'] ?? 0) ?: (int) $hit['entity_id'];
+            $result = app(SignalDelivery::class)->lookup()->responsibleFor($from, $policy['recipient_capability'], [(int) $hit['entity_id']]);
+
+            return [
+                'found' => ! empty($result['found']),
+                'node' => $result['node']['name'] ?? null,
+                'holders' => array_values(array_map(fn ($h) => (string) ($h['name'] ?? ('#' . ($h['entity_id'] ?? '?'))), (array) ($result['holders'] ?? []))),
+            ];
+        } catch (\Throwable $e) {
+            return ['found' => false, 'node' => null, 'holders' => [], 'error' => $e->getMessage()];
+        }
     }
 
     /** Wieder öffnen (Z4): Zähler hoch, Reaktionsuhr neu, Systemkommentar „zum N. Mal in X Tagen“. */

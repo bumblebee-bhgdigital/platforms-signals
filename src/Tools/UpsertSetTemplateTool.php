@@ -24,7 +24,7 @@ class UpsertSetTemplateTool implements ToolContract, ToolMetadataContract
     public function getDescription(): string
     {
         return 'PUT /signals/sets/{set}/templates/{template} - Legt ein Template in ein Signal-Set oder ändert die Zuordnung. Pflicht: signal_set_id, signal_template_id. '
-            . 'Overrides je Set: conditions_override (Objekt, wird über die conditions des Templates gelegt, z. B. {"value": 30}), severity_override, frequency_override, schedule_interval_hours_override; '
+            . 'Overrides je Set: conditions_override (Objekt, wird über die conditions des Templates gelegt, z. B. {"value": 30} oder {"units_only": true} für je Einheit), severity_override, frequency_override, schedule_interval_hours_override; '
             . 'null setzt einen Override zurück. is_active=false pausiert das Template nur in diesem Set. remove=true nimmt es aus dem Set. '
             . 'Vererbung „das nächste gewinnt“: pro Knoten und Template gilt die nächste Zuordnung im Baum (Set am Knoten, sonst an einem Vorfahren mit inherit_down). '
             . 'opts_out=true wählt das Template in diesem Set ab („gilt bei uns nicht“); is_binding=true macht eine Zuordnung verbindlich (unten anpassbar, nicht abwählbar). '

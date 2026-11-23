@@ -66,7 +66,7 @@
                     <x-nx-input-select name="form.frequency" label="Takt" wire:model="form.frequency" :options="collect($P::FREQUENCY_LABELS)->map(fn ($l, $v) => ['value' => $v, 'label' => $l])->values()->all()" />
                 </div>
                 <x-nx-input-textarea name="conditionsJson" label="Bedingungen (JSON)" wire:model="conditionsJson" rows="6" />
-                <p class="text-xs text-[color:var(--nx-muted)]">Schwelle: {"metric","operator","value"} · Trend: {"metric","direction":"increasing|decreasing","periods","min_change_percent"} · Quote: {"numerator","denominator","operator","value","min_denominator","grace_days"} · Vergleich: {"metric_a","metric_b","relationship":"diverging|converging"}</p>
+                <p class="text-xs text-[color:var(--nx-muted)]">Schwelle: {"metric","operator","value"} oder {"all":[{"metric","operator","value"},…]} · Trend: {"metric","direction":"increasing|decreasing","periods","min_change_percent","min_value"} · Quote: {"numerator","denominator","operator","value","min_denominator","grace_days"} · Vergleich: {"metric_a","metric_b","relationship":"diverging|converging"} · Je Einheit statt je Knoten (Summe über den Teilbaum, größte Beiträger in der Meldung): "units_only": true</p>
             @else
                 <x-nx-input-textarea name="form.prompt" label="Prompt" wire:model="form.prompt" rows="6" />
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">

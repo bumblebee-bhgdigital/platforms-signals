@@ -37,6 +37,16 @@ Direkt vs. vererbt: `SignalSetService::setsForNode()` bzw. `signals.signal_sets.
   Ein offenes Signal je Team/Knoten/Template (egal aus welchem Set); entfällt die Bedingung, löst es sich mit Notiz selbst auf; kommt es im
   Zeitfenster wieder, wird das alte Signal **wieder geöffnet** (`recurrence_count`, Kommentar „zum N. Mal in X Tagen“).
   Der frühere Typ-Filter `entity_types`/`exclude_entity_types` entfällt (Schlüssel werden ignoriert) – Abwahl ersetzt ihn.
+- **Bedingungen** (`conditions`, je Set überlagert von `conditions_override`):
+  `threshold {metric, operator, value}` oder kombiniert `{all: [{metric, operator, value}, …]}` (alle müssen zutreffen, fehlende Kennzahl = kein Treffer;
+  Meldung verbindet die Teile mit „ und “) · `trend {metric, direction, periods, min_change_percent, min_value?}` (`min_value`: letzter Wert mindestens) ·
+  `ratio {numerator, denominator, operator, value, min_denominator?, grace_days?}` · `cross_dimension {metric_a, metric_b, relationship}`.
+  **`units_only: true`** (alle vier Muster): nur Einheiten (VSM-Klasse carrier) werten aus, Kennzahlen als `<metric>_cascaded` aus dem Snapshot
+  (Summe über den Teilbaum; fehlt sie, der einfache Wert). Die Meldung nennt die bis zu drei größten Beiträger darunter
+  („– vor allem: IT-Infrastruktur (12), …“, `trigger_metrics.contributors`; abgestiegen wird bis zur nächsten Einheit). Offene Signale an anderen
+  Knoten lösen sich beim nächsten Lauf auf („Regel zählt jetzt je Einheit – zusammengefasst an …“).
+  Beispiel Stillstand: `{"units_only": true, "all": [{"metric": "planner_items_open", "operator": ">=", "value": 5}, {"metric": "planner_items_done_7d", "operator": "==", "value": 0}]}`.
+  Probelauf per MCP: `signals.evaluate.POST {signal_set_id, signal_template_id?, dry_run: true}` → je Template `hits` (new/open/reopen, Empfänger) und `resolving`.
   `responsible_user_id` = Agent des Sets: **Absender und Begleiter**, nicht Empfänger.
 - **Signal** (`Signal`, Morph-Alias `signal`): Lebenszyklus (Schwere inkl. algedonic, Zurückstellen, Zuweisen, Maßnahmen, Kommentare, Fokus) plus **Auflösung**: `resolution_note`,
   `resolution_link_type/id` (Beschluss, Agendapunkt, Sitzung, Risiko, Planner-Aufgabe, Ticket oder Morph-Alias), `resolved_by_user_id`.

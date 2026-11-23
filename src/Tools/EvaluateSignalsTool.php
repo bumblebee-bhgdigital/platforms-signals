@@ -22,7 +22,10 @@ class EvaluateSignalsTool implements ToolContract, ToolMetadataContract
     public function getDescription(): string
     {
         return 'POST /signals/evaluate - Wertet die Regel-Templates eines aktiven Signal-Sets sofort an dessen Knoten aus (sonst automatisch nach jedem Snapshot, 08:16 und 18:16). '
-            . 'Pflicht: signal_set_id. dry_run=true zeigt nur, was anschlagen würde (nichts wird geschrieben) – ideal zum Einstellen von Schwellen. Der Takt wird hier ignoriert.';
+            . 'Pflicht: signal_set_id (Alias set_id). Optional signal_template_id (Alias template_id): nur dieses Template. '
+            . 'dry_run (Default true) zeigt nur, was anschlagen würde – nichts wird geschrieben, ideal zum Einstellen von Schwellen. '
+            . 'Je Template in results[]: hits[] (entity, message, contributors, action new|open|reopen, im Probelauf recipients = wer es bekäme) '
+            . 'und resolving[] (offene Signale, die sich auflösen würden, mit Notiz). force (Default true) ignoriert den Takt.';
     }
 
     public function getSchema(): array
@@ -30,11 +33,13 @@ class EvaluateSignalsTool implements ToolContract, ToolMetadataContract
         return [
             'type' => 'object',
             'properties' => [
-                'signal_set_id' => ['type' => 'integer', 'description' => 'ERFORDERLICH'],
-                'dry_run' => ['type' => 'boolean', 'description' => 'Default true.'],
+                'signal_set_id' => ['type' => 'integer', 'description' => 'ERFORDERLICH (Alias set_id)'],
+                'signal_template_id' => ['type' => 'integer', 'description' => 'Optional: nur dieses Template auswerten (Alias template_id).'],
+                'dry_run' => ['type' => 'boolean', 'description' => 'Default true: nichts schreiben, nur berichten.'],
+                'force' => ['type' => 'boolean', 'description' => 'Default true: Takt (daily/weekly) ignorieren.'],
                 'team_id' => ['type' => 'integer'],
             ],
-            'required' => ['signal_set_id'],
+            'required' => [],
         ];
     }
 
@@ -45,7 +50,7 @@ class EvaluateSignalsTool implements ToolContract, ToolMetadataContract
             if ($error) {
                 return $error;
             }
-            $set = SignalSet::query()->where('team_id', $team->id)->find((int) ($arguments['signal_set_id'] ?? 0));
+            $set = SignalSet::query()->where('team_id', $team->id)->find((int) ($arguments['signal_set_id'] ?? $arguments['set_id'] ?? 0));
             if (! $set) {
                 return ToolResult::error('NOT_FOUND', 'Signal-Set nicht gefunden.');
             }
@@ -57,7 +62,10 @@ class EvaluateSignalsTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'Das Set ist nicht aktiv. Erst mit signals.signal_sets.PUT status=active aktivieren.');
             }
 
-            $report = app(SignalEvaluationService::class)->run($set->id, true, $dryRun);
+            $templateId = (int) ($arguments['signal_template_id'] ?? $arguments['template_id'] ?? 0) ?: null;
+            $force = ! array_key_exists('force', $arguments) || (bool) $arguments['force'];
+
+            $report = app(SignalEvaluationService::class)->run($set->id, $force, $dryRun, null, $templateId);
 
             return ToolResult::success(array_merge($report, ['dry_run' => $dryRun, 'nodes_in_scope' => count(app(SignalEvaluationService::class)->scopeEntityIds($set))]));
         } catch (\Throwable $e) {

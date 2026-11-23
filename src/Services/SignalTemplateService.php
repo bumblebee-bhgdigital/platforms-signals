@@ -177,6 +177,26 @@ class SignalTemplateService
 
     private function assertConditions(string $pattern, array $conditions): void
     {
+        // kombinierte Schwelle: {"all": [{metric, operator, value}, …]} – jede Teilbedingung wie eine einfache Schwelle
+        if ($pattern === 'threshold' && array_key_exists('all', $conditions)) {
+            if (! is_array($conditions['all']) || $conditions['all'] === [] || ! array_is_list($conditions['all'])) {
+                throw new SignalSetException('conditions.all muss eine nicht leere Liste von {metric, operator, value} sein.');
+            }
+            foreach ($conditions['all'] as $i => $part) {
+                if (! is_array($part)) {
+                    throw new SignalSetException("conditions.all[{$i}] muss ein Objekt {metric, operator, value} sein.");
+                }
+                try {
+                    $this->assertConditions('threshold', $part);
+                } catch (SignalSetException $e) {
+                    throw new SignalSetException("conditions.all[{$i}]: " . $e->getMessage());
+                }
+            }
+            $conditions = array_diff_key($conditions, ['all' => true, 'metric' => true, 'value' => true]) + ['metric' => '-', 'value' => 0];
+        }
+        if (isset($conditions['min_value']) && ! is_numeric($conditions['min_value'])) {
+            throw new SignalSetException('conditions.min_value muss eine Zahl sein.');
+        }
         foreach (self::REQUIRED_CONDITIONS[$pattern] ?? [] as $key) {
             if (! array_key_exists($key, $conditions) || $conditions[$key] === '' || $conditions[$key] === null) {
                 throw new SignalSetException("conditions.{$key} fehlt (Muster {$pattern} braucht: " . implode(', ', self::REQUIRED_CONDITIONS[$pattern]) . ').');

@@ -24,9 +24,12 @@ class CreateSignalTemplateTool implements ToolContract, ToolMetadataContract
     public function getDescription(): string
     {
         return 'POST /signals/templates - Legt ein Signal-Template an. Pflicht: name, kind (rule | inference, Default rule). '
-            . 'rule: pattern_type + conditions. threshold {metric, operator, value}; trend {metric, direction increasing|decreasing, periods, min_change_percent}; '
+            . 'rule: pattern_type + conditions. threshold {metric, operator, value} oder kombiniert {all: [{metric, operator, value}, …]} (alle müssen zutreffen); '
+            . 'trend {metric, direction increasing|decreasing, periods, min_change_percent, min_value? (letzter Wert mindestens)}; '
             . 'ratio {numerator, denominator, operator, value, min_denominator?, grace_days?}; cross_dimension {metric_a, metric_b, relationship diverging|converging}. '
             . 'no_responsible {capability?: manage} = „Einheit ohne Verantwortlichen“: jede Einheit (VSM-Klasse carrier) im Geltungsbereich, an der niemand die Fähigkeit hält (Standard-Schweregrad critical; Empfänger ist der Verantwortliche darüber; erledigt sich, sobald jemand eingetragen ist). '
+            . 'units_only: true (threshold/trend/ratio/cross_dimension) = je Einheit statt je Knoten: nur Einheiten (VSM-Klasse carrier) werten aus, mit <metric>_cascaded (Summe über den Teilbaum); '
+            . 'die Meldung nennt die größten Beiträger darunter („– vor allem: …“, trigger_metrics.contributors). Offene Signale an anderen Knoten lösen sich beim nächsten Lauf auf. '
             . 'Wo eine Regel nicht gelten soll: im Set weiter unten abwählen (signals.set_templates.PUT opts_out=true) – Knotentyp-Filter gibt es nicht mehr. '
             . 'Kennzahlen sind die Metriken der Knoten-Snapshots (z. B. items_open, items_done, items_total, time_total_minutes, planner_items_overdue, mb_*). frequency: every_snapshot | daily | weekly. '
             . 'inference: prompt, vsm_system (s1–s5, s3_star), dimension, schedule_interval_hours. '

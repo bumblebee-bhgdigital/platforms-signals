@@ -18,17 +18,37 @@ use Platform\Signals\Contracts\ResponsibilityLookup;
  *
  * Liefert je auslösendem Knoten: ['entity_id', 'message', 'metrics'] und optional 'recipient_from_entity_id'
  * (Empfänger ab diesem Knoten suchen statt am Knoten selbst).
+ *
+ * units_only (alle Kennzahl-Muster): nur Einheiten (VSM-Klasse carrier) werten aus, mit <metric>_cascaded aus dem
+ * Snapshot (Summe über den Teilbaum), sonst dem einfachen Wert. Die Meldung nennt dann die größten Beiträger
+ * darunter („– vor allem: …“, metrics.contributors). So skaliert eine Regel mit der Zahl der Einheiten statt der Projekte.
  */
 class RuleEvaluator
 {
+    /** Muster, für die units_only gilt (no_responsible arbeitet ohnehin nur an Einheiten). */
+    public const UNIT_PATTERNS = ['threshold', 'trend', 'ratio', 'cross_dimension'];
+
+    /** Höchstzahl der Beiträger in der Meldung. */
+    public const MAX_CONTRIBUTORS = 3;
+
+    /** Läuft die aktuelle Auswertung je Einheit (units_only)? */
+    protected bool $unitsOnly = false;
+
+    /** @var array<string, string>|null Kennzahl => lesbarer Name (pro Instanz geladen) */
+    protected ?array $labels = null;
+
     /** @return array<int, array{entity_id:int, message:string, metrics:array}> */
     public function evaluate(string $patternType, array $conditions, array $entityIds): array
     {
+        $this->unitsOnly = self::isUnitsOnly($patternType, $conditions);
+        if ($this->unitsOnly) {
+            $entityIds = $this->unitIds($entityIds);
+        }
         if ($entityIds === []) {
             return [];
         }
 
-        return match ($patternType) {
+        $triggered = match ($patternType) {
             'threshold' => $this->evaluateThreshold($conditions, $entityIds),
             'trend' => $this->evaluateTrend($conditions, $entityIds),
             'cross_dimension' => $this->evaluateCrossDimension($conditions, $entityIds),
@@ -36,19 +56,66 @@ class RuleEvaluator
             'no_responsible' => $this->evaluateNoResponsible($conditions, $entityIds),
             default => [],
         };
+
+        if ($this->unitsOnly && $triggered !== []) {
+            $triggered = $this->withContributors($triggered, $this->mainMetric($patternType, $conditions));
+        }
+
+        return $triggered;
+    }
+
+    public static function isUnitsOnly(string $patternType, array $conditions): bool
+    {
+        return in_array($patternType, self::UNIT_PATTERNS, true) && filter_var($conditions['units_only'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Nur die Einheiten (VSM-Klasse carrier) unter den Knoten.
+     *
+     * @param  int[]  $entityIds
+     * @return int[]
+     */
+    public function unitIds(array $entityIds): array
+    {
+        if ($entityIds === []) {
+            return [];
+        }
+
+        return OrganizationEntity::query()->whereIn('id', $entityIds)
+            ->whereHas('type', fn ($q) => $q->where('vsm_class', OrganizationEntityType::VSM_CLASS_CARRIER))
+            ->pluck('id')->map(fn ($id) => (int) $id)->all();
+    }
+
+    /**
+     * Nächste Einheit (carrier) ab einem Knoten aufwärts (der Knoten selbst zählt mit), z. B. für die Auflösungsnotiz.
+     *
+     * @return array{id:int, name:string}|null
+     */
+    public function nearestUnit(int $entityId): ?array
+    {
+        $current = OrganizationEntity::with('type:id,vsm_class')->find($entityId, ['id', 'name', 'parent_entity_id', 'entity_type_id']);
+        for ($depth = 0; $current && $depth < 50; $depth++) {
+            if ($current->type?->vsm_class === OrganizationEntityType::VSM_CLASS_CARRIER) {
+                return ['id' => (int) $current->id, 'name' => (string) $current->name];
+            }
+            $current = $current->parent_entity_id
+                ? OrganizationEntity::with('type:id,vsm_class')->find($current->parent_entity_id, ['id', 'name', 'parent_entity_id', 'entity_type_id'])
+                : null;
+        }
+
+        return null;
     }
 
     /**
      * Threshold evaluation: compare a single metric against a value.
      * conditions: {"metric": "items_total", "operator": ">", "value": 100}
+     * Kombiniert (alle müssen zutreffen): {"all": [{"metric": "planner_items_open", "operator": ">=", "value": 5},
+     *                                             {"metric": "planner_items_done_7d", "operator": "==", "value": 0}]}
      */
     protected function evaluateThreshold(array $conditions, array $entityIds): array
     {
-        $metric = $conditions['metric'] ?? null;
-        $operator = $conditions['operator'] ?? '>';
-        $threshold = $conditions['value'] ?? 0;
-
-        if (! $metric) {
+        $parts = $this->thresholdParts($conditions);
+        if ($parts === []) {
             return [];
         }
 
@@ -57,38 +124,67 @@ class RuleEvaluator
         $triggered = [];
 
         foreach ($snapshots as $entityId => $snapshot) {
-            // Fehlende Kennzahl = Einheit hat dazu keine Daten (z. B. keine Projekte) → nicht als 0 werten
-            if (! isset($snapshot->metrics[$metric])) {
-                continue;
+            $texts = [];
+            $values = [];
+            foreach ($parts as ['metric' => $metric, 'operator' => $operator, 'value' => $threshold]) {
+                $value = $this->metricValue((array) $snapshot->metrics, $metric);
+                // Fehlende Kennzahl = Einheit hat dazu keine Daten (z. B. keine Projekte) → nicht als 0 werten
+                if ($value === null || ! $this->compare($value, $operator, $threshold)) {
+                    continue 2;
+                }
+                $values[$metric] = $value;
+                $texts[] = "{$this->label($metric)} = {$value} ({$operator} {$threshold})";
             }
-            $value = $snapshot->metrics[$metric];
 
-            $matches = match ($operator) {
-                '>' => $value > $threshold,
-                '>=' => $value >= $threshold,
-                '<' => $value < $threshold,
-                '<=' => $value <= $threshold,
-                '==' => $value == $threshold,
-                '!=' => $value != $threshold,
-                default => false,
-            };
-
-            if ($matches) {
-                $entityName = $entities[$entityId] ?? "Entity #{$entityId}";
-                $triggered[] = [
-                    'entity_id' => $entityId,
-                    'message' => "{$entityName}: {$metric} = {$value} ({$operator} {$threshold})",
-                    'metrics' => [$metric => $value],
-                ];
-            }
+            $entityName = $entities[$entityId] ?? "Entity #{$entityId}";
+            $triggered[] = [
+                'entity_id' => $entityId,
+                'message' => "{$entityName}: " . implode(' und ', $texts),
+                'metrics' => $values,
+            ];
         }
 
         return $triggered;
     }
 
     /**
+     * Teilbedingungen einer Schwelle: entweder „all“ (Liste) oder die einzelne metric/operator/value.
+     *
+     * @return list<array{metric:string, operator:string, value:mixed}>
+     */
+    protected function thresholdParts(array $conditions): array
+    {
+        $list = isset($conditions['all']) && is_array($conditions['all']) && $conditions['all'] !== []
+            ? $conditions['all']
+            : [$conditions];
+        $parts = [];
+        foreach ($list as $part) {
+            if (! is_array($part) || empty($part['metric'])) {
+                return []; // unvollständige Teilbedingung → Regel schlägt nicht an (wie ohne metric)
+            }
+            $parts[] = ['metric' => (string) $part['metric'], 'operator' => (string) ($part['operator'] ?? '>'), 'value' => $part['value'] ?? 0];
+        }
+
+        return $parts;
+    }
+
+    protected function compare($value, string $operator, $threshold): bool
+    {
+        return match ($operator) {
+            '>' => $value > $threshold,
+            '>=' => $value >= $threshold,
+            '<' => $value < $threshold,
+            '<=' => $value <= $threshold,
+            '==' => $value == $threshold,
+            '!=' => $value != $threshold,
+            default => false,
+        };
+    }
+
+    /**
      * Trend evaluation: check if metric moves in a direction over N periods.
      * conditions: {"metric": "time_total_minutes", "direction": "decreasing", "periods": 3, "min_change_percent": 10}
+     * min_value (optional): nur anschlagen, wenn der letzte Wert mindestens so groß ist (kleine Ausgangswerte ausblenden).
      */
     protected function evaluateTrend(array $conditions, array $entityIds): array
     {
@@ -96,6 +192,7 @@ class RuleEvaluator
         $direction = $conditions['direction'] ?? 'increasing'; // increasing or decreasing
         $periods = $conditions['periods'] ?? 3;
         $minChangePercent = $conditions['min_change_percent'] ?? 10;
+        $minValue = isset($conditions['min_value']) && is_numeric($conditions['min_value']) ? (float) $conditions['min_value'] : null;
 
         if (! $metric) {
             return [];
@@ -128,11 +225,11 @@ class RuleEvaluator
             // Check if all consecutive changes go in the expected direction
             $consistent = true;
             $totalChange = 0;
-            $firstValue = $recent->first()->metrics[$metric] ?? 0;
+            $firstValue = $this->metricValue((array) $recent->first()->metrics, $metric) ?? 0;
 
             for ($i = 1; $i < $recent->count(); $i++) {
-                $prev = $recent[$i - 1]->metrics[$metric] ?? 0;
-                $curr = $recent[$i]->metrics[$metric] ?? 0;
+                $prev = $this->metricValue((array) $recent[$i - 1]->metrics, $metric) ?? 0;
+                $curr = $this->metricValue((array) $recent[$i]->metrics, $metric) ?? 0;
                 $diff = $curr - $prev;
 
                 if ($direction === 'increasing' && $diff <= 0) {
@@ -149,7 +246,10 @@ class RuleEvaluator
                 continue;
             }
 
-            $lastValue = $recent->last()->metrics[$metric] ?? 0;
+            $lastValue = $this->metricValue((array) $recent->last()->metrics, $metric) ?? 0;
+            if ($minValue !== null && $lastValue < $minValue) {
+                continue;
+            }
             $changePercent = $firstValue != 0
                 ? abs(($lastValue - $firstValue) / $firstValue) * 100
                 : ($lastValue != 0 ? 100 : 0);
@@ -162,7 +262,7 @@ class RuleEvaluator
             $dirLabel = $direction === 'increasing' ? 'steigend' : 'fallend';
             $triggered[] = [
                 'entity_id' => $entityId,
-                'message' => "{$entityName}: {$metric} {$dirLabel} über {$periods} Perioden ({$firstValue} → {$lastValue}, " . round($changePercent, 1) . '%)',
+                'message' => "{$entityName}: {$this->label($metric)} {$dirLabel} über {$periods} Perioden ({$firstValue} → {$lastValue}, " . round($changePercent, 1) . '%)',
                 'metrics' => [$metric => $lastValue, 'change_percent' => round($changePercent, 1)],
             ];
         }
@@ -205,8 +305,9 @@ class RuleEvaluator
             $first = $unique->first();
             $last = $unique->last();
 
-            $gapFirst = ($first->metrics[$metricA] ?? 0) - ($first->metrics[$metricB] ?? 0);
-            $gapLast = ($last->metrics[$metricA] ?? 0) - ($last->metrics[$metricB] ?? 0);
+            $m = fn ($snap, $key) => $this->metricValue((array) $snap->metrics, $key) ?? 0;
+            $gapFirst = $m($first, $metricA) - $m($first, $metricB);
+            $gapLast = $m($last, $metricA) - $m($last, $metricB);
 
             $isDiverging = abs($gapLast) > abs($gapFirst) * 1.2; // 20% threshold
             $isConverging = abs($gapLast) < abs($gapFirst) * 0.8;
@@ -217,11 +318,11 @@ class RuleEvaluator
             if ($matches) {
                 $entityName = $entities[$entityId] ?? "Entity #{$entityId}";
                 $relLabel = $relationship === 'diverging' ? 'divergieren' : 'konvergieren';
-                $aVal = $last->metrics[$metricA] ?? 0;
-                $bVal = $last->metrics[$metricB] ?? 0;
+                $aVal = $m($last, $metricA);
+                $bVal = $m($last, $metricB);
                 $triggered[] = [
                     'entity_id' => $entityId,
-                    'message' => "{$entityName}: {$metricA} und {$metricB} {$relLabel} ({$aVal} vs. {$bVal})",
+                    'message' => "{$entityName}: {$this->label($metricA)} und {$this->label($metricB)} {$relLabel} ({$aVal} vs. {$bVal})",
                     'metrics' => [$metricA => $aVal, $metricB => $bVal],
                 ];
             }
@@ -260,8 +361,8 @@ class RuleEvaluator
         $triggered = [];
 
         foreach ($snapshots as $entityId => $snapshot) {
-            $numVal = $snapshot->metrics[$numerator] ?? 0;
-            $denVal = $snapshot->metrics[$denominator] ?? 0;
+            $numVal = $this->metricValue((array) $snapshot->metrics, $numerator) ?? 0;
+            $denVal = $this->metricValue((array) $snapshot->metrics, $denominator) ?? 0;
 
             if ($denVal == 0 || $denVal < $minDenominator) {
                 continue;
@@ -321,6 +422,118 @@ class RuleEvaluator
                 'recipient_from_entity_id' => $unit->parent_entity_id ? (int) $unit->parent_entity_id : null,
             ];
         }
+
+        return $triggered;
+    }
+
+    /**
+     * Wert einer Kennzahl aus einem Snapshot; bei units_only bevorzugt <metric>_cascaded (Summe über den Teilbaum).
+     * null = Kennzahl fehlt.
+     */
+    protected function metricValue(array $metrics, string $metric)
+    {
+        if ($this->unitsOnly && isset($metrics[$metric . '_cascaded'])) {
+            return $metrics[$metric . '_cascaded'];
+        }
+
+        return $metrics[$metric] ?? null;
+    }
+
+    /** Lesbarer Name einer Kennzahl – nur bei units_only (sonst bleibt die Meldung wie bisher beim Schlüssel). */
+    protected function label(string $metric): string
+    {
+        if (! $this->unitsOnly) {
+            return $metric;
+        }
+        if ($this->labels === null) {
+            $this->labels = [];
+            try {
+                $registry = class_exists(\Platform\Organization\Services\EntityLinkRegistry::class) ? app(\Platform\Organization\Services\EntityLinkRegistry::class) : null;
+                foreach ((array) $registry?->allMetricDefinitions() as $key => $def) {
+                    if (! empty($def['label'])) {
+                        $this->labels[$key] = (string) $def['label'];
+                    }
+                }
+            } catch (\Throwable) {
+                // ohne Kennzahl-Katalog bleibt es beim Schlüssel
+            }
+        }
+
+        return $this->labels[$metric] ?? $metric;
+    }
+
+    /** Kennzahl, nach der die Beiträger einer Einheit sortiert werden. */
+    protected function mainMetric(string $patternType, array $conditions): ?string
+    {
+        $key = match ($patternType) {
+            'threshold' => $this->thresholdParts($conditions)[0]['metric'] ?? null,
+            'trend' => $conditions['metric'] ?? null,
+            'ratio' => $conditions['numerator'] ?? null,
+            'cross_dimension' => $conditions['metric_a'] ?? null,
+            default => null,
+        };
+
+        return $key ? (string) $key : null;
+    }
+
+    /**
+     * Größte Beiträger je Einheit anhängen: Unterknoten (über parent_entity_id, ohne die Einheit selbst) mit dem
+     * einfachen Wert der Hauptkennzahl > 0, höchstens MAX_CONTRIBUTORS. An einer eingebetteten Einheit wird nicht
+     * weiter abgestiegen – sie zählt selbst als Beiträger (mit ihrer Teilbaum-Summe).
+     * Gebündelt: eine Abfrage je Baumebene über alle Einheiten, eine für die Snapshots.
+     */
+    protected function withContributors(array $triggered, ?string $metric): array
+    {
+        if (! $metric) {
+            return $triggered;
+        }
+
+        $rootOf = [];     // Knoten => Einheit, zu der er beiträgt
+        $nested = [];     // eingebettete Einheiten (dort nicht weiter absteigen)
+        $names = [];
+        $queue = array_map(fn ($t) => (int) $t['entity_id'], $triggered);
+        $owner = array_combine($queue, $queue);
+        for ($depth = 0; $queue !== [] && $depth < 50; $depth++) {
+            $children = OrganizationEntity::with('type:id,vsm_class')->whereIn('parent_entity_id', $queue)->where('is_active', true)
+                ->get(['id', 'name', 'parent_entity_id', 'entity_type_id']);
+            $next = [];
+            foreach ($children as $child) {
+                $id = (int) $child->id;
+                if (isset($rootOf[$id])) {
+                    continue; // schon gesehen (Mehrfachpfad/Zyklus)
+                }
+                $rootOf[$id] = $owner[(int) $child->parent_entity_id];
+                $names[$id] = (string) $child->name;
+                if ($child->type?->vsm_class === OrganizationEntityType::VSM_CLASS_CARRIER) {
+                    $nested[$id] = true;
+                    continue;
+                }
+                $owner[$id] = $rootOf[$id];
+                $next[] = $id;
+            }
+            $queue = $next;
+        }
+
+        $snapshots = $this->getLatestSnapshots(array_keys($rootOf));
+        $byUnit = [];
+        foreach ($rootOf as $id => $unitId) {
+            $metrics = (array) ($snapshots[$id]->metrics ?? []);
+            $value = isset($nested[$id]) ? ($metrics[$metric . '_cascaded'] ?? $metrics[$metric] ?? null) : ($metrics[$metric] ?? null);
+            if (is_numeric($value) && $value > 0) {
+                $byUnit[$unitId][] = ['entity_id' => $id, 'name' => $names[$id], 'value' => $value + 0];
+            }
+        }
+
+        foreach ($triggered as &$hit) {
+            $list = $byUnit[(int) $hit['entity_id']] ?? [];
+            usort($list, fn ($a, $b) => $b['value'] <=> $a['value'] ?: strcmp($a['name'], $b['name']));
+            $list = array_slice($list, 0, self::MAX_CONTRIBUTORS);
+            $hit['metrics']['contributors'] = $list;
+            if ($list !== []) {
+                $hit['message'] .= ' – vor allem: ' . implode(', ', array_map(fn ($c) => "{$c['name']} (" . (is_float($c['value']) ? round($c['value'], 1) : $c['value']) . ')', $list));
+            }
+        }
+        unset($hit);
 
         return $triggered;
     }
