@@ -163,6 +163,10 @@ class SignalEvaluationService
                 if (! $dryRun && (int) $open->signal_set_template_id !== (int) $assignment->id) {
                     $open->forceFill(['signal_set_template_id' => $assignment->id, 'signal_set_id' => $set->id])->save();
                 }
+                // nachholen: offen, aber nie zugestellt (z. B. vor Einführung der Zustellung entstanden)
+                if (! $dryRun && ! $open->delivered_at && $open->recipient_reason === null) {
+                    app(SignalDelivery::class)->deliver($open, $hit['recipient_from_entity_id'] ?? null);
+                }
                 continue;
             }
 

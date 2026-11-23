@@ -383,6 +383,23 @@ class SignalsChannelTest extends TestCase
         $this->assertSame('acknowledged', $signal->fresh()->status);
     }
 
+    public function test_open_signal_without_delivery_is_delivered_on_the_next_run(): void
+    {
+        $this->evaluate();
+        $signal = $this->at('a1');
+        SignalDeliveryOp::where('signal_id', $signal->id)->delete();
+        $signal->forceFill(['delivered_at' => null, 'recipient_reason' => null, 'recipient_entity_ids' => null, 'recipient_user_ids' => null, 'delivery_state' => null])->saveQuietly();
+
+        $this->evaluate();
+        $signal->refresh();
+        $this->assertNotNull($signal->delivered_at);
+        $this->assertSame([$this->users['Anna']->id], array_map('intval', (array) $signal->recipient_user_ids));
+        $this->assertSame(['create'], array_map(fn ($o) => $o->op, $this->ops($signal, 'pending')));
+
+        $this->evaluate();
+        $this->assertCount(1, $this->ops($signal), 'nur einmal nachholen');
+    }
+
     public function test_person_signal_goes_to_the_room_above_without_the_person(): void
     {
         $this->ids['dora'] = $this->person('Dora', $this->ids['a1']);
