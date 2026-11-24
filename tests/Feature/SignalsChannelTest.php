@@ -516,6 +516,76 @@ class SignalsChannelTest extends TestCase
         $this->assertSame([], $this->tool(GetDeliveriesTool::class, [], $this->s['agent'])->data['deliveries']);
     }
 
+    public function test_closing_a_delivered_signal_drops_the_pending_reminder(): void
+    {
+        $signal = $this->deliveredA1();
+        $this->assertSame(1, $this->escalate('2026-11-25 08:00')['reminded']);
+        [$reminder] = $this->ops($signal, 'pending');
+        $this->assertSame('comment', $reminder->op);
+
+        app(SignalService::class)->transition($signal->fresh(), 'dismiss', $this->users['Anna'], ['reason' => 'Regel ersetzt']);
+
+        $this->assertSame(['cancelled', 'Überholt: Signal geschlossen.'], [$reminder->fresh()->status, $reminder->fresh()->last_error]);
+        $rows = $this->tool(GetDeliveriesTool::class, [], $this->s['agent'])->data['deliveries'];
+        $this->assertSame([['close', true]], array_map(fn ($r) => [$r['op'], $r['ready']], $rows), 'close sofort ausführbar, keine Erinnerung davor');
+    }
+
+    public function test_reading_the_queue_clears_old_comments_stuck_before_a_close(): void
+    {
+        $signal = $this->deliveredA1();
+        // Altbestand: Erinnerung und close aus der Zeit vor der Regel
+        $old = SignalDeliveryOp::create(['signal_id' => $signal->id, 'op' => 'comment', 'payload' => ['text' => 'Erinnerung', 'purpose' => 'reminder']]);
+        $close = SignalDeliveryOp::create(['signal_id' => $signal->id, 'op' => 'close', 'payload' => ['note' => 'zu']]);
+
+        // nur auf ein Signal geschaut, ohne close: nichts verfällt
+        $other = $this->deliveredA1Like('a2', 'th-a2');
+        $keep = SignalDeliveryOp::create(['signal_id' => $other->id, 'op' => 'comment', 'payload' => ['text' => 'Hinweis']]);
+        $this->tool(GetDeliveriesTool::class, ['signal_id' => $other->id], $this->s['agent']);
+        $this->assertSame('pending', $keep->fresh()->status);
+
+        $rows = $this->tool(GetDeliveriesTool::class, ['signal_id' => $signal->id], $this->s['agent'])->data['deliveries'];
+        $this->assertSame('cancelled', $old->fresh()->status);
+        $this->assertSame([[$close->id, true]], array_map(fn ($r) => [$r['op_id'], $r['ready']], $rows));
+        $this->assertSame('pending', $keep->fresh()->status);
+    }
+
+    public function test_pending_orders_reach_the_agent_work_inbox(): void
+    {
+        if (! interface_exists('Platform\\Organization\\Contracts\\AgentWorkSource')) {
+            eval('namespace Platform\\Organization\\Contracts; interface AgentWorkSource { public function key(): string; public function workFor(\\Platform\\Organization\\Models\\OrganizationEntity $agent): array; }');
+        }
+        $source = new \Platform\Signals\Organization\SignalsAgentWork();
+        $agent = (new \Platform\Organization\Models\OrganizationEntity())->forceFill(['linked_user_id' => $this->s['agent']->id]);
+        $this->assertSame([], $source->workFor($agent), 'nichts liegt');
+
+        $this->evaluate();
+        $this->setOpen('a2', 80);
+        $this->evaluate();
+        [$item] = $source->workFor($agent);
+        $this->assertSame(['signals.deliveries', 2, 'signals.deliveries.GET'], [$item['key'], $item['count'], $item['tool']]);
+        $this->assertStringContainsString('2 Zustell-Aufträge für Signale bereit (2× anlegen)', $item['text']);
+        $this->assertSame(0.8, $item['weight'], 'kritisch');
+
+        Carbon::setTestNow(Carbon::parse('2026-11-24 08:00'));
+        $this->assertSame(1.0, $source->workFor($agent)[0]['weight'], 'wartet länger als einen halben Tag');
+
+        foreach ($this->tool(GetDeliveriesTool::class, [], $this->s['agent'])->data['deliveries'] as $row) {
+            $this->report($row['op_id'], true, 'th-' . $row['signal_id']);
+        }
+        $this->assertSame([], $source->workFor($agent), 'abgearbeitet → leer');
+        $this->assertSame([], $source->workFor((new \Platform\Organization\Models\OrganizationEntity())->forceFill(['linked_user_id' => $this->users['Anna']->id])), 'nur der Zustell-Agent');
+    }
+
+    private function deliveredA1Like(string $key, string $thread): Signal
+    {
+        $this->setOpen($key, 80);
+        $this->evaluate();
+        $signal = $this->at($key);
+        $this->assertTrue($this->report($this->ops($signal)[0]->id, true, $thread)->success);
+
+        return $signal->fresh();
+    }
+
     // ── Adapter und lose Kopplung ────────────────────────────────
 
     public function test_the_adapter_maps_organization_events(): void

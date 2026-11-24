@@ -26,6 +26,8 @@ use Platform\Signals\Models\SignalSet;
  *    Vorgang, wird stattdessen der Vorgang angelegt (mit dem aktuellen Stand)
  *  - je Signal der Reihe nach (id aufsteigend); wird ein Signal geschlossen, bevor der Vorgang überhaupt angelegt
  *    wurde, verfallen die offenen Aufträge (cancelled) – kein Vorgang, der sofort wieder zugeht
+ *  - wird ein Signal mit Vorgang geschlossen, verfallen noch offene Kommentare und Übergaben (z. B. eine Erinnerung)
+ *    – der Agent erinnert nicht erst, um gleich danach zu schließen
  *  - Fehler zählen die Versuche hoch; nach MAX_ATTEMPTS ist der Auftrag fehlgeschlagen (Systemkommentar am Signal)
  *
  * Kein Auftrag darf den Lebenszyklus eines Signals verhindern: alle Einstiege fangen Fehler ab.
@@ -168,8 +170,35 @@ class SignalDeliveryQueue
                 }
             }
 
+            if ($op === 'close') {
+                $this->supersedeBeforeClose($signal->id, true);
+            }
+
             return SignalDeliveryOp::create(['signal_id' => $signal->id, 'op' => $op, 'payload' => $payload]);
         });
+    }
+
+    /**
+     * Vor einem Schließen sind offene Kommentare und Übergaben überholt (Erinnerung, „liegt jetzt beim LA“ …).
+     * Ohne $signalId für alle Signale mit offenem close – räumt auch Aufträge ab, die vor dieser Regel entstanden.
+     * $closing: der close für $signalId wird gerade angelegt (gilt als nach allen offenen Aufträgen).
+     */
+    public function supersedeBeforeClose(?int $signalId = null, bool $closing = false): int
+    {
+        $closes = SignalDeliveryOp::query()->where('status', 'pending')->where('op', 'close')
+            ->when($signalId, fn ($q) => $q->where('signal_id', $signalId))
+            ->selectRaw('signal_id, MAX(id) as close_id')->groupBy('signal_id')->pluck('close_id', 'signal_id');
+        if ($signalId && $closing) {
+            $closes[$signalId] = PHP_INT_MAX;
+        }
+        $n = 0;
+        foreach ($closes as $sid => $closeId) {
+            $n += SignalDeliveryOp::query()->where('signal_id', $sid)->where('status', 'pending')
+                ->whereIn('op', ['comment', 'handover'])->where('id', '<', $closeId)
+                ->update(['status' => 'cancelled', 'last_error' => 'Überholt: Signal geschlossen.', 'updated_at' => now()]);
+        }
+
+        return $n;
     }
 
     private function insertCreate(Signal $signal, array $payload): SignalDeliveryOp
@@ -323,6 +352,7 @@ class SignalDeliveryQueue
      */
     public function pendingFor(int $agentUserId, ?int $signalId = null, int $limit = 100): array
     {
+        $this->supersedeBeforeClose($signalId);
         $setIds = SignalSet::withTrashed()->where(fn ($q) => $q->where('delivery_agent_user_id', $agentUserId)
             ->orWhere(fn ($w) => $w->whereNull('delivery_agent_user_id')->where('responsible_agent_user_id', $agentUserId)))->pluck('id')->all();
         $ops = SignalDeliveryOp::query()->where('status', 'pending')

@@ -206,6 +206,7 @@ class SignalsServiceProvider extends ServiceProvider
         $this->registerTools();
         $this->registerAlgedonicListener();
         $this->registerDeliveryChannel();
+        $this->registerAgentWork();
         $this->registerSchedule();
     }
 
@@ -217,6 +218,17 @@ class SignalsServiceProvider extends ServiceProvider
     {
         if (\Platform\Signals\Organization\OrganizationParlanFeedback::available()) {
             \Platform\Signals\Support\DeliveryChannels::register(new \Platform\Signals\Organization\OrganizationParlanFeedback());
+        }
+    }
+
+    /**
+     * Arbeitseingang der Agenten (Organization): offene Zustell-Aufträge erscheinen beim Zustell-Agenten im Takt.
+     * Ohne Organisation (oder ältere ohne Arbeitseingang) bleibt es bei signals.deliveries.GET.
+     */
+    protected function registerAgentWork(): void
+    {
+        if (class_exists(\Platform\Organization\Support\AgentWorkSources::class)) {
+            \Platform\Organization\Support\AgentWorkSources::register(new \Platform\Signals\Organization\SignalsAgentWork());
         }
     }
 

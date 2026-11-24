@@ -75,6 +75,7 @@ Direkt vs. vererbt: `SignalSetService::setsForNode()` bzw. `signals.signal_sets.
   Auslöser: zugestellt → create · Linie → handover (Grund, wer hatte es, wie lange) · Gremium → comment · wieder aufgetreten → reopen ·
   Halbzeit der Reaktionszeit ohne Reaktion → eine Erinnerung (`signals:escalate`) · gelöst/verworfen/automatisch aufgelöst → close.
   Der Agent holt sie mit `signals.deliveries.GET` und meldet mit `signals.deliveries.POST` (thread, nach 5 Fehlversuchen `failed` + Systemkommentar).
+  Offene Aufträge erscheinen im Arbeitseingang des Agenten (Organization `GET /api/org/agent/work`, Zeile `signals.deliveries`) – so weckt der Takt ihn. Beim Schließen verfallen offene Kommentare/Übergaben davor.
   Felder am Signal: `delivery_thread`, `delivery_room_entity_id`, `delivery_state` (null · pending · open · closed). Anleitung für den Agenten: `docs/AGENT-ZUSTELLUNG.md`.
 - **Rückweg aus Parlan**: Vertrag `Contracts\DeliveryChannel` (`onFeedback`), Registry `Support\DeliveryChannels`, Adapter
   `Organization\OrganizationParlanFeedback` (einzige Stelle, die das Ereignis `CoordinationEventsRecorded` der Organisation kennt).

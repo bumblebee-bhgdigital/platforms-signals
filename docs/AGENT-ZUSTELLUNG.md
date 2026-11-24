@@ -5,7 +5,12 @@ Parlan-Aufgabe je Signal** zu den Verantwortlichen – über die ganze Lebensdau
 nicht selbst handeln (dort zählt nur, was du signierst). Darum legt Signals dir **Aufträge** hin, du führst sie mit
 deinem Parlan-Zugang aus und meldest zurück. Fristen, Eskalation und Empfänger rechnet Signals – nicht du.
 
-## Ablauf (z. B. stündlich und wenn du ohnehin aktiv bist)
+## Wann
+
+Liegen Aufträge für dich, steht das in deinem Arbeitseingang (`GET /api/org/agent/work`, Zeile `signals.deliveries`
+mit Anzahl und Dringlichkeit) – der Daemon holt ihn jeden Takt, Neues weckt dich. Dann:
+
+## Ablauf
 
 1. **Aufträge holen:** `signals.deliveries.GET` → `deliveries[]`, älteste zuerst. Nur Einträge mit `ready: true`
    jetzt ausführen; die anderen warten auf einen früheren Auftrag desselben Signals (`waits_for_op_id`).
@@ -23,6 +28,8 @@ deinem Parlan-Zugang aus und meldest zurück. Fristen, Eskalation und Empfänger
    - Bei `create` ist `thread` Pflicht (ID des neuen Vorgangs). Darüber ordnet Signals die Reaktionen dem Signal zu.
    - Hast du bei `reopen`/`handover` einen neuen Vorgang angelegt: neue `thread` mitgeben. Signals merkt sich auch
      den alten – eine späte Reaktion dort zählt noch.
+   - Wird ein Signal geschlossen, verfallen noch offene Kommentare und Übergaben davor (z. B. eine Erinnerung) –
+     das `close` ist dann sofort dran.
    - Hat etwas nicht geklappt: `{op_id, ok: false, error: "…"}`. Der Auftrag kommt wieder; nach 5 Fehlversuchen gilt er
      als fehlgeschlagen, am Signal steht ein Systemkommentar (das Signal bleibt über die Seite erreichbar).
 4. Antwort von POST enthält `next_for_signal` – den nächsten Auftrag desselben Signals, falls einer wartet.
